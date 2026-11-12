@@ -26,7 +26,7 @@ Everything stays on your computer. There are no dependencies to install.
 1. **Orca**, in a terminal:
 
    ```sh
-   orca plugin install sydneyhylia/requests
+   orca plugin install sydneydesign/requests
    ```
 
    Orca shows what the plugin needs (it runs its own code, nothing else) and gives you the same command with `--approve` to confirm.
@@ -34,7 +34,7 @@ Everything stays on your computer. There are no dependencies to install.
 2. **Claude Code**:
 
    ```
-   /plugin marketplace add sydneyhylia/requests
+   /plugin marketplace add sydneydesign/requests
    /plugin install requests@requests
    ```
 

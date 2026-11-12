@@ -8,9 +8,9 @@
   "license": "MIT",
   "author": {
     "name": "Sydney",
-    "url": "https://github.com/sydneyhylia"
+    "url": "https://github.com/sydneydesign"
   },
-  "repository": "https://github.com/sydneyhylia/requests",
+  "repository": "https://github.com/sydneydesign/requests",
   "engines": {
     "orca": ">=1.4.248"
   },

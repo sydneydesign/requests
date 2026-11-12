@@ -2,7 +2,7 @@
   "name": "requests",
   "owner": {
     "name": "Sydney",
-    "url": "https://github.com/sydneyhylia"
+    "url": "https://github.com/sydneydesign"
   },
   "description": "Requests: follow what you ask Claude for, thread by thread, in an Orca panel.",
   "plugins": [

@@ -4,10 +4,10 @@
   "description": "Splits what you ask for in the chat into requests, groups them into threads and keeps them up to date for the Orca panel.",
   "author": {
     "name": "Sydney",
-    "url": "https://github.com/sydneyhylia"
+    "url": "https://github.com/sydneydesign"
   },
-  "homepage": "https://github.com/sydneyhylia/requests",
-  "repository": "https://github.com/sydneyhylia/requests",
+  "homepage": "https://github.com/sydneydesign/requests",
+  "repository": "https://github.com/sydneydesign/requests",
   "license": "MIT",
   "keywords": [
     "requests",
