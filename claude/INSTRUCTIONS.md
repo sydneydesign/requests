@@ -15,6 +15,7 @@ The user may send several things in a row in the same chat, related or not, and 
    Use `--status queued` if it has to wait for something else.
 4. **Close it when you finish:** `{{CLI}} update <id> --status done --answer "<one or two sentences on what happened>"`, plus `--file <path>` for every file that came out of it.
 5. **If you need something from the user** (a decision, a fact, an approval): `--status needs-you --question "<the question, short>"`. If it is a task for them (a reminder), it also goes in needs-you, with `--via "Reminder"`.
+   **A request that needs the user stays open until they answer that question.** If their next message is about something else, leave it as it is: don't close it, don't change it and don't take the new message as the answer. Only update it when they reply with its `[id]` or clearly answer what you asked. If you can't tell, ask.
 6. **If you hand it off** to a subagent or another session, say so in `--via` ("Subagent", "Docs session").
 7. **In your reply**, after logging them, write one short line: `→ 3 requests logged: Pricing page (2), Login bug (1)`. Don't repeat the whole list.
 

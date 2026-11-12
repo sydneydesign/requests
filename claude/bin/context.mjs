@@ -52,4 +52,24 @@ if (mode === 'start') {
   console.log(`${instructions}\n${openRequests()}`)
 } else if (mode === 'message') {
   console.log(`[requests] If this message brings new requests or moves an existing one, log it with ${cli} (instructions at the start of the session).`)
+  const waiting = waitingOnUser()
+  if (waiting) console.log(waiting)
+}
+
+// Reminds Claude, with every message, what is still waiting on the user, so a reply about
+// something else never closes it by accident. Prints nothing when nothing is waiting.
+function waitingOnUser() {
+  let data
+  try {
+    data = read()
+  } catch {
+    return ''
+  }
+  const waiting = data.items
+    .filter((i) => i.status === 'need')
+    .sort((a, b) => b.updated.localeCompare(a.updated))
+  if (!waiting.length) return ''
+  const shown = waiting.slice(0, 5).map((i) => `[${i.id}] ${i.title.length > 50 ? i.title.slice(0, 47) + '…' : i.title}`)
+  const more = waiting.length > 5 ? `, and ${waiting.length - 5} more` : ''
+  return `[requests] Still waiting on the user: ${shown.join('; ')}${more}. Keep them open unless this message answers them.`
 }
