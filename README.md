@@ -10,8 +10,10 @@ When you send Claude Code several things in one message, Requests splits them in
 
 Requests has two parts that share one file, `~/.requests/requests.json`:
 
-- **A Claude Code plugin** gives Claude its instructions at the start of every session, plus a small command to log and update requests.
+- **A Claude Code plugin** gives Claude its instructions at the start of every session, plus a small command to log and update requests. Each request remembers the Orca chat it was last updated from.
 - **An Orca plugin** watches that file and shows it as a panel in the right sidebar and a counter in the status bar.
+
+The list follows your topics, not your sessions: a request stays open until it's addressed, even if the chat it came from has closed.
 
 Everything stays on your computer. There are no dependencies to install.
 
@@ -45,9 +47,16 @@ Everything stays on your computer. There are no dependencies to install.
 - Talk to Claude as usual. When it logs something, it adds a line like `→ 2 requests logged: Pricing page (1), Login bug (1)`.
 - Open the flag icon in Orca's right sidebar. Requests are grouped by project, and anything that needs you is listed first.
 - New updates from Claude show in bold with a dot. They count as read once you open them in the panel or write in the chat they came from.
-- To answer one, press **Go to chat**. Orca switches to the chat the request came from and copies its reference, so you can paste it and write after it: `[k3fp] the second option`.
+- To answer one, press **Go to chat**. Orca switches to the chat the request came from and copies its reference, so you can paste it and write after it: `[k3fp] the second option`. When you answer, Claude moves the request on.
 
-Quick questions Claude answers on the spot aren't logged. Anything that involves work is, even if it's finished in the same reply. A request stays open until it's addressed, even if the chat it came from has closed.
+| Status | Meaning |
+| --- | --- |
+| Needs you | Claude is waiting for a decision, an answer or something only you can do. |
+| In progress | Claude, a subagent or another session is working on it. |
+| Queued | It's waiting for something else to finish first. |
+| Done | It's addressed. You can reopen it from the panel. |
+
+The status bar counter turns orange only when something new needs you. Quick questions Claude answers on the spot aren't logged; anything that involves work is, even if it's finished in the same reply.
 
 ## Updating
 
@@ -61,7 +70,8 @@ In Claude Code: `/plugin marketplace update requests`
 
 - If Claude Code asks for permission every time it logs a request, allow `node …/requests.mjs` in `/permissions`.
 - The list is per computer. It doesn't sync between machines.
-- Orca doesn't let plugins jump to a point in the chat or open their own panel, so the panel shows Claude's answer inline and the counter is informational.
+- **Go to chat** opens the chat's tab, not a specific message in it. Requests logged before version 0.4.0 don't know their chat, so they offer **Copy reference** instead.
+- Clicking the counter doesn't open the panel, because Orca doesn't let plugins open their own panel.
 
 ## Development
 
