@@ -1,0 +1,15 @@
+{
+  "name": "requests",
+  "owner": {
+    "name": "Sydney",
+    "url": "https://github.com/sydneyhylia"
+  },
+  "description": "Requests: follow what you ask Claude for, thread by thread, in an Orca panel.",
+  "plugins": [
+    {
+      "name": "requests",
+      "source": "./claude",
+      "description": "Splits what you ask for in the chat into requests, groups them into threads and keeps them up to date for the Orca panel."
+    }
+  ]
+}

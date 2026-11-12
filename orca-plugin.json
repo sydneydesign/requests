@@ -1,0 +1,40 @@
+{
+  "$schema": "https://raw.githubusercontent.com/stablyai/orca/main/docs/schemas/plugins/orca-plugin.v2.schema.json",
+  "manifestVersion": 2,
+  "id": "requests",
+  "name": "Requests",
+  "version": "0.3.0",
+  "description": "What you ask Claude for in the chat, split into requests and grouped into threads, with their status.",
+  "license": "MIT",
+  "author": {
+    "name": "Sydney",
+    "url": "https://github.com/sydneyhylia"
+  },
+  "repository": "https://github.com/sydneyhylia/requests",
+  "engines": {
+    "orca": ">=1.4.248"
+  },
+  "execution": "trusted-worker",
+  "pluginApi": 1,
+  "main": "orca/worker.mjs",
+  "contributes": {
+    "panels": [
+      {
+        "id": "requests",
+        "title": "Requests",
+        "icon": "flag",
+        "entry": "orca/panel/index.html"
+      }
+    ],
+    "statusBarItems": [
+      {
+        "id": "counter",
+        "text": "Requests",
+        "icon": "flag",
+        "tone": "neutral",
+        "tooltip": "Requests to Claude"
+      }
+    ]
+  },
+  "capabilities": []
+}

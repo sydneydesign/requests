@@ -1,0 +1,18 @@
+{
+  "name": "requests",
+  "version": "0.3.0",
+  "description": "Splits what you ask for in the chat into requests, groups them into threads and keeps them up to date for the Orca panel.",
+  "author": {
+    "name": "Sydney",
+    "url": "https://github.com/sydneyhylia"
+  },
+  "homepage": "https://github.com/sydneyhylia/requests",
+  "repository": "https://github.com/sydneyhylia/requests",
+  "license": "MIT",
+  "keywords": [
+    "requests",
+    "tasks",
+    "orca",
+    "hooks"
+  ]
+}
