@@ -153,11 +153,53 @@ export function add(data, fields) {
     question: text(fields.question, 'question', 2000),
     files: (fields.files || []).map((f) => text(f, 'file', 400)).filter(Boolean),
     via: text(fields.via, 'via', 120),
+    origin: fields.origin || null,
     created: now(),
-    updated: now()
+    updated: now(),
+    changed: now(),
+    seen: null
   }
   data.items.push(item)
   return { item, thread }
+}
+
+// Where a request was last touched by Claude: the Orca workspace, tab and terminal of that
+// chat, read from the environment Orca gives each terminal. Null outside Orca.
+export function originFromEnv(env = process.env) {
+  if (!env.ORCA_TERMINAL_HANDLE && !env.ORCA_TAB_ID) return null
+  return {
+    workspace: env.ORCA_WORKSPACE_ID || env.ORCA_WORKTREE_ID || null,
+    tab: env.ORCA_TAB_ID || null,
+    terminal: env.ORCA_TERMINAL_HANDLE || null
+  }
+}
+
+// Unread: Claude changed it after the user last saw it. Requests from before this field existed count as read.
+export function isUnread(item) {
+  return Boolean(item.changed) && (!item.seen || item.seen < item.changed)
+}
+
+export function sameChat(a, b) {
+  if (!a || !b) return false
+  return (a.terminal && a.terminal === b.terminal) || (a.tab && a.tab === b.tab)
+}
+
+// Marks as read every unread request whose chat is `origin`. Returns how many changed.
+export function markChatSeen(data, origin) {
+  let n = 0
+  for (const i of data.items) {
+    if (isUnread(i) && sameChat(i.origin, origin)) {
+      i.seen = now()
+      n++
+    }
+  }
+  return n
+}
+
+export function markSeen(data, id) {
+  const item = findItem(data, id)
+  item.seen = now()
+  return item
 }
 
 export function findItem(data, id) {
@@ -166,7 +208,9 @@ export function findItem(data, id) {
   return item
 }
 
-export function update(data, id, changes) {
+// `by` is "claude" (default) or "user". A change by Claude makes the request unread and records
+// which chat it came from; a change by the user in the panel counts as having seen it.
+export function update(data, id, changes, { by = 'claude', origin = null } = {}) {
   const item = findItem(data, id)
   if (changes.status !== undefined) item.status = validStatus(changes.status)
   if (changes.title !== undefined) item.title = text(changes.title, 'title', 140) || item.title
@@ -180,6 +224,12 @@ export function update(data, id, changes) {
   // A request that is done or moving again no longer waits on the user.
   if (changes.status !== undefined && item.status !== 'need' && changes.question === undefined) item.question = ''
   item.updated = now()
+  if (by === 'user') {
+    item.seen = now()
+  } else {
+    item.changed = now()
+    if (origin) item.origin = origin
+  }
   const thread = data.threads.find((t) => t.id === item.thread)
   if (thread) thread.updated = now()
   return { item, thread }

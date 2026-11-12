@@ -43,10 +43,11 @@ Everything stays on your computer. There are no dependencies to install.
 ## Usage
 
 - Talk to Claude as usual. When it logs something, it adds a line like `→ 2 requests logged: Pricing page (1), Login bug (1)`.
-- Open the flag icon in Orca's right sidebar. Anything that needs you is listed first.
-- To answer one, press **Reply**, paste the reference into Claude's terminal and write after it: `[k3fp] the second option`.
+- Open the flag icon in Orca's right sidebar. Requests are grouped by project, and anything that needs you is listed first.
+- New updates from Claude show in bold with a dot. They count as read once you open them in the panel or write in the chat they came from.
+- To answer one, press **Go to chat**. Orca switches to the chat the request came from and copies its reference, so you can paste it and write after it: `[k3fp] the second option`.
 
-Quick questions Claude answers on the spot aren't logged. Anything that involves work is, even if it's finished in the same reply.
+Quick questions Claude answers on the spot aren't logged. Anything that involves work is, even if it's finished in the same reply. A request stays open until it's addressed, even if the chat it came from has closed.
 
 ## Updating
 

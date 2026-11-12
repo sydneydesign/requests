@@ -3,7 +3,7 @@
   "manifestVersion": 2,
   "id": "requests",
   "name": "Requests",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "What you ask Claude for in the chat, split into requests and grouped into threads, with their status.",
   "license": "MIT",
   "author": {

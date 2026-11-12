@@ -95,8 +95,15 @@
     return [i.title, i.said, i.answer, i.question, i.via, t.topic, t.project].join(' ').toLowerCase().includes(view.query)
   }
   const newest = (a, b) => b.updated.localeCompare(a.updated)
+  // Same rule as the store: Claude changed it after the user last saw it.
+  const isUnread = (i) => Boolean(i.changed) && (!i.seen || i.seen < i.changed)
 
   // ---------- Pieces
+  // Takes you to the request's chat when it knows which one; otherwise copies the reference.
+  function replyButton(i, primary) {
+    const label = i.origin ? 'Go to chat' : 'Copy reference'
+    return `<button class="${primary ? 'primary' : ''}" data-action="goto">${label}</button>`
+  }
   function row(i, { meta, card } = {}) {
     const open = view.expanded === i.id
     return `<button class="row" data-action="expand" aria-expanded="${open}">
@@ -106,7 +113,7 @@
         ${meta ? `<span class="meta">${esc(meta)}</span>` : ''}
         ${!card && i.status === 'done' && i.answer && !open ? `<span class="preview">${esc(i.answer)}</span>` : ''}
       </span>
-      <span class="when">${when(i.updated)}</span>
+      <span class="when">${isUnread(i) ? '<span class="new-dot" role="img" aria-label="New"></span>' : ''}${when(i.updated)}</span>
     </button>`
   }
 
@@ -114,9 +121,9 @@
     const confirming = view.confirming === i.id
     const waiting = i.status === 'need'
     return `<div class="actions">
-      ${waiting ? `<button class="primary" data-action="reply">Reply</button>` : ''}
+      ${waiting ? replyButton(i, true) : ''}
       ${i.status === 'done' ? `<button data-action="reopen">Reopen</button>` : `<button data-action="done">Mark done</button>`}
-      ${waiting ? '' : `<button data-action="reply">Copy reference</button>`}
+      ${waiting ? '' : replyButton(i, false)}
       <button data-action="remove" class="${confirming ? 'confirm' : ''}">${confirming ? 'Sure? Remove' : 'Remove'}</button>
     </div>`
   }
@@ -133,20 +140,26 @@
   }
 
   function item(i, options = {}) {
-    const classes = ['item', view.expanded === i.id ? 'open' : '', i.status === 'done' ? 'is-done' : '', view.changed.has(i.id) ? 'changed' : '']
+    const classes = [
+      'item',
+      view.expanded === i.id ? 'open' : '',
+      i.status === 'done' ? 'is-done' : '',
+      isUnread(i) ? 'unread' : '',
+      view.changed.has(i.id) ? 'changed' : ''
+    ]
     return `<div class="${classes.join(' ')}" data-id="${esc(i.id)}">${row(i, options)}${detail(i)}</div>`
   }
 
   function card(i) {
     const t = threadOf(i)
     const open = view.expanded === i.id
-    const classes = ['card', open ? 'open' : '', view.changed.has(i.id) ? 'changed' : '']
+    const classes = ['card', open ? 'open' : '', isUnread(i) ? 'unread' : '', view.changed.has(i.id) ? 'changed' : '']
     return `<div class="${classes.join(' ')}" data-id="${esc(i.id)}">
       ${row(i, { meta: t.topic, card: true })}
       ${i.question ? `<p class="question">${esc(i.question)}</p>` : ''}
       ${open
         ? detail(i, { noQuestion: true })
-        : `<div class="actions"><button class="primary" data-action="reply">Reply</button><button data-action="done">Mark done</button></div>`}
+        : `<div class="actions">${replyButton(i, true)}<button data-action="done">Mark done</button></div>`}
     </div>`
   }
 
@@ -179,6 +192,8 @@
     else if (n.need) sentence = needs
     else if (n.moving) sentence = `${n.moving} in progress, nothing waiting on you`
     else sentence = `<span class="calm">All clear</span>`
+    const fresh = all.filter(isUnread).length
+    if (fresh) sentence += `<span class="calm">, ${fresh} new</span>`
     $('summary').innerHTML = sentence
 
     const projects = [...new Set(view.snapshot.data.threads.map((t) => t.project))].sort((a, b) => a.localeCompare(b))
@@ -405,13 +420,33 @@
     if (action === 'expand') {
       view.expanded = view.expanded === id ? null : id
       view.confirming = null
-      return draw()
+      draw()
+      // Opening it counts as reading it.
+      if (view.expanded === id && current && isUnread(current)) {
+        try {
+          receive(await ask('requests.seen', { id }))
+        } catch {}
+      }
+      return
     }
-    if (action === 'reply') {
+    if (action === 'goto') {
+      // Copy first: the clipboard only works right after the click.
       const ref = `[${id}]`
-      return copy(ref + ' ')
-        ? toast(`Copied ${ref}. Paste it in Claude's terminal and type your reply after it.`)
-        : toast(`Start your message to Claude with ${ref} and type your reply after it.`)
+      const copied = copy(ref + ' ')
+      const paste = copied ? `${ref} is copied: paste it and write your reply.` : `Start your message with ${ref}.`
+      if (!current?.origin) {
+        return toast(copied ? `Copied ${ref}. Paste it in Claude's chat and write your reply after it.` : `Start your message to Claude with ${ref}.`)
+      }
+      try {
+        const r = await ask('requests.goto', { id })
+        receive(r.snapshot)
+        if (r.result === 'switched') toast(`Opened the chat. ${paste}`)
+        else if (r.result === 'closed') toast(`That chat is closed. The request stays open. ${paste}`)
+        else toast(`Couldn't open the chat. ${paste}`)
+      } catch (error) {
+        toast(`Couldn't open the chat: ${error.message}`)
+      }
+      return
     }
     if (!current) return
     try {

@@ -142,6 +142,11 @@ button.section:hover { color: var(--text); }
 .row > span:nth-child(2) { min-width: 0; }
 .item > .row:hover, .item.open > .row, .card > .row:hover { background: var(--hover); }
 .title { display: block; overflow-wrap: anywhere; }
+.unread > .row .title { font-weight: 600; }
+.new-dot {
+  display: inline-block; width: 6px; height: 6px; margin: 0 6px 1px 0;
+  border-radius: 50%; background: var(--run); vertical-align: middle;
+}
 .is-done .title { color: var(--muted); }
 .when { font-size: var(--t-meta); line-height: var(--lh-meta); color: var(--muted); white-space: nowrap; font-variant-numeric: tabular-nums; }
 .preview {

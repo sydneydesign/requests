@@ -1,11 +1,11 @@
 #!/usr/bin/env node
 // Run by the Claude Code hooks. Whatever it prints goes into Claude's context.
 //   start    → when a session starts: the instructions and the open requests.
-//   message  → with every user message: a one-line reminder.
+//   message  → with every user message: marks this chat's updates as read, plus a short reminder.
 import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { STATUS_NAME, read } from './store.mjs'
+import { STATUS_NAME, isUnread, markChatSeen, modify, originFromEnv, read, sameChat } from './store.mjs'
 
 const here = path.dirname(fileURLToPath(import.meta.url))
 const cli = `node "${path.join(here, 'requests.mjs')}"`
@@ -51,9 +51,22 @@ if (mode === 'start') {
   const instructions = fs.readFileSync(path.join(here, '..', 'INSTRUCTIONS.md'), 'utf8').replaceAll('{{CLI}}', cli)
   console.log(`${instructions}\n${openRequests()}`)
 } else if (mode === 'message') {
+  markThisChatSeen()
   console.log(`[requests] If this message brings new requests or moves an existing one, log it with ${cli} (instructions at the start of the session).`)
   const waiting = waitingOnUser()
   if (waiting) console.log(waiting)
+}
+
+// The user just wrote in this chat, so they have read what Claude said here: mark this chat's
+// unread requests as read. Only writes when there is something to mark.
+function markThisChatSeen() {
+  const origin = originFromEnv()
+  if (!origin) return
+  try {
+    const data = read()
+    if (!data.items.some((i) => isUnread(i) && sameChat(i.origin, origin))) return
+    modify((d) => markChatSeen(d, origin))
+  } catch {}
 }
 
 // Reminds Claude, with every message, what is still waiting on the user, so a reply about

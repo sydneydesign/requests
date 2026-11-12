@@ -2,7 +2,7 @@
 // The command Claude uses to log and update the user's requests.
 // Help: node requests.mjs help
 import path from 'node:path'
-import { STATUS_NAME, add, clean, count, filePath, modify, read, remove, update } from './store.mjs'
+import { STATUS_NAME, add, clean, count, filePath, modify, originFromEnv, read, remove, update } from './store.mjs'
 
 const HELP = `Usage: node requests.mjs <command> [options]
 
@@ -90,14 +90,14 @@ function main() {
   switch (command) {
     case 'new': {
       const { item, thread } = modify((d) =>
-        add(d, { ...options, project: options.project || process.env.REQUESTS_PROJECT || path.basename(process.cwd()) })
+        add(d, { ...options, origin: originFromEnv(), project: options.project || process.env.REQUESTS_PROJECT || path.basename(process.cwd()) })
       )
       return `Logged: ${line(item, thread)}`
     }
     case 'update': {
       const id = positional[0]
       if (!id) throw new Error('Missing the id. Example: update k3fp --status done')
-      const { item, thread } = modify((d) => update(d, id, options))
+      const { item, thread } = modify((d) => update(d, id, options, { by: 'claude', origin: originFromEnv() }))
       return `Updated: ${line(item, thread)}`
     }
     case 'list':

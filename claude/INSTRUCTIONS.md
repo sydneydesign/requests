@@ -13,9 +13,9 @@ The user may send several things in a row in the same chat, related or not, and 
 3. **Log it before you start on it:**
    `{{CLI}} new --project "<project>" --thread "<thread>" --title "<what, starting with a verb>" --said "<the user's exact words for this request>" --status working`
    Use `--status queued` if it has to wait for something else.
-4. **Close it when you finish:** `{{CLI}} update <id> --status done --answer "<one or two sentences on what happened>"`, plus `--file <path>` for every file that came out of it.
+4. **Close it only when it is addressed:** `{{CLI}} update <id> --status done --answer "<one or two sentences on what happened>"`, plus `--file <path>` for every file that came out of it. Addressed means what the user asked for is done or settled, or they say so. The list follows the user's topics, not your sessions or agents: don't close a request because a session ends, a subagent finishes a step or you move on to something else. If part of it is left, keep it open and say what's left in `--answer`.
 5. **If you need something from the user** (a decision, a fact, an approval): `--status needs-you --question "<the question, short>"`. If it is a task for them (a reminder), it also goes in needs-you, with `--via "Reminder"`.
-   **A request that needs the user stays open until they answer that question.** If their next message is about something else, leave it as it is: don't close it, don't change it and don't take the new message as the answer. Only update it when they reply with its `[id]` or clearly answer what you asked. If you can't tell, ask.
+   **A request that needs the user stays open until they answer that question.** If their next message is about something else, leave it as it is: don't close it, don't change it and don't take the new message as the answer. Only update it when they reply with its `[id]` or clearly answer what you asked. If you can't tell, ask. **When they do answer, move it on right away:** to `working` while you act on the answer, or to `done` if the answer settles it.
 6. **If you hand it off** to a subagent or another session, say so in `--via` ("Subagent", "Docs session").
 7. **In your reply**, after logging them, write one short line: `→ 3 requests logged: Pricing page (2), Login bug (1)`. Don't repeat the whole list.
 
