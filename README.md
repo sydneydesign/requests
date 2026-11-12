@@ -2,7 +2,7 @@
 
 Follow what you ask Claude for, one thread at a time.
 
-When you send Claude Code several things in one message, Requests splits them into separate requests, groups them by topic and tracks each one's status. [Orca](https://github.com/stablyai/orca) shows them in a sidebar panel, with a status bar counter for anything that needs your input.
+When you send Claude Code several things in one message, Requests splits them into separate requests, groups them by project and topic, and tracks each one's status. [Orca](https://github.com/stablyai/orca) shows them in a sidebar panel, with a status bar counter for anything that needs your input.
 
 ![The Requests panel in light and dark themes](docs/panel.png)
 

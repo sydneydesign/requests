@@ -13,6 +13,7 @@
     query: '',
     expanded: null,
     collapsed: new Set(),
+    collapsedProjects: new Set(),
     showToday: false,
     confirming: null,
     changed: new Set()
@@ -24,10 +25,19 @@
     if (saved.tab === 'open' || saved.tab === 'done') view.tab = saved.tab
     if (typeof saved.project === 'string') view.project = saved.project
     if (typeof saved.showToday === 'boolean') view.showToday = saved.showToday
+    if (Array.isArray(saved.collapsedProjects)) view.collapsedProjects = new Set(saved.collapsedProjects)
   } catch {}
   function remember() {
     try {
-      localStorage.setItem('requests.view', JSON.stringify({ tab: view.tab, project: view.project, showToday: view.showToday }))
+      localStorage.setItem(
+        'requests.view',
+        JSON.stringify({
+          tab: view.tab,
+          project: view.project,
+          showToday: view.showToday,
+          collapsedProjects: [...view.collapsedProjects]
+        })
+      )
     } catch {}
   }
 
@@ -132,7 +142,7 @@
     const open = view.expanded === i.id
     const classes = ['card', open ? 'open' : '', view.changed.has(i.id) ? 'changed' : '']
     return `<div class="${classes.join(' ')}" data-id="${esc(i.id)}">
-      ${row(i, { meta: view.project ? t.topic : `${t.topic} (${t.project})`, card: true })}
+      ${row(i, { meta: t.topic, card: true })}
       ${i.question ? `<p class="question">${esc(i.question)}</p>` : ''}
       ${open
         ? detail(i, { noQuestion: true })
@@ -148,7 +158,7 @@
     return `<section class="thread ${collapsed ? 'collapsed' : ''}" data-thread="${esc(t.id)}">
       <button class="thread-head" data-action="collapse" aria-expanded="${!collapsed}">
         ${chevron()}
-        <span class="thread-name"><b>${esc(t.topic)}</b>${view.project ? '' : `<small>${esc(t.project)}</small>`}</span>
+        <span class="thread-name"><b>${esc(t.topic)}</b></span>
         <span class="count" aria-label="${items.length} in progress">${items.length}</span>
       </button>
       <div class="items">${items.map((i) => item(i, { meta: i.via })).join('')}</div>
@@ -185,34 +195,69 @@
       .join('')
   }
 
+  // In-progress requests of one project, grouped by thread, most recently touched first.
+  function threads(moving) {
+    const byThread = new Map()
+    for (const i of moving) {
+      if (!byThread.has(i.thread)) byThread.set(i.thread, [])
+      byThread.get(i.thread).push(i)
+    }
+    const groups = [...byThread.values()].map((items) => ({
+      t: threadOf(items[0]),
+      items: items.sort((a, b) => ORDER[a.status] - ORDER[b.status] || newest(a, b))
+    }))
+    groups.sort((a, b) => b.items[0].updated.localeCompare(a.items[0].updated))
+    return groups.map((g) => thread(g.t, g.items)).join('')
+  }
+
+  function projectSummary(need, moving) {
+    const parts = []
+    if (need) parts.push(`<span class="need">${need} need${need > 1 ? '' : 's'} you</span>`)
+    if (moving) parts.push(`${moving} in progress`)
+    return parts.join(', ')
+  }
+
+  // Open tab: one group per project. Inside each, what needs the user first, then threads in
+  // progress. Projects with something waiting on the user come first. With a project picked in
+  // the filter there is only one group, so it goes without a header.
   function drawOpen(all) {
     const visible = all.filter(matches)
-    const need = visible.filter((i) => i.status === 'need').sort(newest)
-    const moving = visible.filter((i) => i.status === 'run' || i.status === 'queue')
+    const open = visible.filter((i) => i.status !== 'done')
     const today = visible.filter((i) => i.status === 'done' && isToday(i.updated)).sort(newest)
     let html = ''
 
-    if (need.length) {
-      html += `<h2 class="section need">Needs you <span class="n">${need.length}</span></h2>`
-      html += need.map(card).join('')
+    const byProject = new Map()
+    for (const i of open) {
+      const p = threadOf(i).project
+      if (!byProject.has(p)) byProject.set(p, [])
+      byProject.get(p).push(i)
     }
+    const projects = [...byProject.entries()].map(([name, items]) => ({
+      name,
+      need: items.filter((i) => i.status === 'need').sort(newest),
+      moving: items.filter((i) => i.status === 'run' || i.status === 'queue'),
+      latest: items.reduce((m, i) => (i.updated > m ? i.updated : m), '')
+    }))
+    projects.sort((a, b) => (b.need.length > 0) - (a.need.length > 0) || b.latest.localeCompare(a.latest))
 
-    if (moving.length) {
-      html += `<h2 class="section">In progress <span class="n">${moving.length}</span></h2>`
-      const byThread = new Map()
-      for (const i of moving) {
-        if (!byThread.has(i.thread)) byThread.set(i.thread, [])
-        byThread.get(i.thread).push(i)
+    const withHeaders = !view.project
+    for (const p of projects) {
+      const body = p.need.map(card).join('') + threads(p.moving)
+      if (!withHeaders) {
+        html += body
+        continue
       }
-      const groups = [...byThread.values()].map((items) => ({
-        t: threadOf(items[0]),
-        items: items.sort((a, b) => ORDER[a.status] - ORDER[b.status] || newest(a, b))
-      }))
-      groups.sort((a, b) => b.items[0].updated.localeCompare(a.items[0].updated))
-      html += groups.map((g) => thread(g.t, g.items)).join('')
+      const collapsed = view.collapsedProjects.has(p.name) && !view.query
+      html += `<section class="project ${collapsed ? 'collapsed' : ''}" data-project="${esc(p.name)}">
+        <button class="project-head" data-action="collapse-project" aria-expanded="${!collapsed}">
+          ${chevron()}
+          <span><span class="project-name">${esc(p.name)}</span><span class="project-sum">${projectSummary(p.need.length, p.moving.length)}</span></span>
+        </button>
+        <div class="project-body">${body}</div>
+      </section>`
     }
 
-    if (!need.length && !moving.length) {
+    if (!open.length) {
       html += view.query
         ? `<div class="empty"><b>Nothing open matches “${esc(view.query)}”</b>Try the Done tab.</div>`
         : `<div class="empty"><b>Nothing open</b>Everything you asked for is done.</div>`
@@ -221,7 +266,14 @@
     if (today.length) {
       const open = view.showToday || Boolean(view.query)
       html += `<button class="section" data-action="toggle-today" aria-expanded="${open}">Done today <span class="n">${today.length}</span>${chevron(open ? '' : 'transform:rotate(-90deg)')}</button>`
-      if (open) html += today.map((i) => item(i, { meta: threadOf(i).topic })).join('')
+      if (open) {
+        html += today
+          .map((i) => {
+            const t = threadOf(i)
+            return item(i, { meta: view.project ? t.topic : `${t.topic} (${t.project})` })
+          })
+          .join('')
+      }
     }
     return html
   }
@@ -337,6 +389,12 @@
 
     if (action === 'collapse') {
       view.collapsed.has(threadId) ? view.collapsed.delete(threadId) : view.collapsed.add(threadId)
+      return draw()
+    }
+    if (action === 'collapse-project') {
+      const name = b.closest('[data-project]')?.dataset.project
+      view.collapsedProjects.has(name) ? view.collapsedProjects.delete(name) : view.collapsedProjects.add(name)
+      remember()
       return draw()
     }
     if (action === 'toggle-today') {
