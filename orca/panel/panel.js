@@ -80,6 +80,15 @@
     if (sameDay(d, yesterday())) return 'Yesterday'
     return d.toLocaleDateString(LOCALE, { weekday: 'long', day: 'numeric', month: 'long' })
   }
+  // Same rule as the store: in progress with no update for over 30 min. Probably done and never closed.
+  const STALE_MINUTES = 30
+  const isStale = (i) => i.status === 'run' && Date.now() - Date.parse(i.updated) > STALE_MINUTES * 60000
+  function idleFor(iso) {
+    const min = Math.round((Date.now() - Date.parse(iso)) / 60000)
+    if (min < 60) return `${min} min`
+    if (min < 1440) return `${Math.round(min / 60)} h`
+    return `${Math.round(min / 1440)} d`
+  }
   const isToday = (iso) => sameDay(new Date(iso), new Date())
 
   // ---------- Filtering
@@ -113,7 +122,7 @@
         ${meta ? `<span class="meta">${esc(meta)}</span>` : ''}
         ${!card && i.status === 'done' && i.answer && !open ? `<span class="preview">${esc(i.answer)}</span>` : ''}
       </span>
-      <span class="when">${isUnread(i) ? '<span class="new-dot" role="img" aria-label="New"></span>' : ''}${when(i.updated)}</span>
+      <span class="when${isStale(i) ? ' stale' : ''}"${isStale(i) ? ' title="No update from Claude in a while. Mark it done if it is finished."' : ''}>${isUnread(i) ? '<span class="new-dot" role="img" aria-label="New"></span>' : ''}${isStale(i) ? `idle ${idleFor(i.updated)}` : when(i.updated)}</span>
     </button>`
   }
 

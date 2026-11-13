@@ -56,6 +56,10 @@ Everything stays on your computer. There are no dependencies to install.
 | Queued | It's waiting for something else to finish first. |
 | Done | It's addressed. You can reopen it from the panel. |
 
+A request in progress with no update for over 30 minutes shows "idle" and how long, in orange. It is probably finished and never closed: mark it done, or tell Claude. Claude also gets a reminder about its own idle requests with every message.
+
+The file stores the statuses as short codes: `need`, `run`, `queue` and `done`. Claude's command takes them as `needs-you`, `working`, `queued` and `done`.
+
 The status bar counter turns orange only when something new needs you. Quick questions Claude answers on the spot aren't logged; anything that involves work is, even if it's finished in the same reply.
 
 ## Updating

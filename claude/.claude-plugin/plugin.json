@@ -1,6 +1,6 @@
 {
   "name": "requests",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "description": "Splits what you ask for in the chat into requests, groups them into threads and keeps them up to date for the Orca panel.",
   "author": {
     "name": "Sydney",
