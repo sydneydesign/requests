@@ -25,10 +25,11 @@ Everything stays on your computer. There are no dependencies to install.
 
 ## Install
 
-1. **Orca**, in a terminal:
+1. **Orca**, in a terminal. Orca has no command that installs a plugin from GitHub, so you load a copy of this repo as a development folder:
 
    ```sh
-   orca plugin install sydneydesign/requests
+   git clone https://github.com/sydneydesign/requests
+   orca plugin dev load requests
    ```
 
    Orca shows what the plugin needs (it runs its own code, nothing else) and gives you the same command with `--approve` to confirm.
@@ -64,11 +65,15 @@ The status bar counter turns orange only when something new needs you. Quick que
 
 ## Updating
 
+Orca, in the folder you cloned:
+
 ```sh
-orca plugin update
+git pull
 ```
 
-In Claude Code: `/plugin marketplace update requests`
+Orca reloads the plugin when its files change. If the new version asks for new access, the panel stops until you approve it. `orca plugin list` shows it as `pending`. Run `orca plugin dev load <folder>` and confirm with the `--approve` command it prints.
+
+In Claude Code: `/plugin marketplace update requests`, then start a new session.
 
 ## Notes
 
