@@ -5,7 +5,7 @@
 import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { STATUS_NAME, isUnread, markChatSeen, modify, originFromEnv, read, sameChat } from './store.mjs'
+import { STALE_MINUTES, STATUS_NAME, isStale, isUnread, markChatSeen, modify, originFromEnv, read, sameChat } from './store.mjs'
 
 const here = path.dirname(fileURLToPath(import.meta.url))
 const cli = `node "${path.join(here, 'requests.mjs')}"`
@@ -55,6 +55,8 @@ if (mode === 'start') {
   console.log(`[requests] If this message brings new requests or moves an existing one, log it with ${cli} (instructions at the start of the session).`)
   const waiting = waitingOnUser()
   if (waiting) console.log(waiting)
+  const stale = staleInThisChat()
+  if (stale) console.log(stale)
 }
 
 // The user just wrote in this chat, so they have read what Claude said here: mark this chat's
@@ -85,4 +87,24 @@ function waitingOnUser() {
   const shown = waiting.slice(0, 5).map((i) => `[${i.id}] ${i.title.length > 50 ? i.title.slice(0, 47) + '…' : i.title}`)
   const more = waiting.length > 5 ? `, and ${waiting.length - 5} more` : ''
   return `[requests] Still waiting on the user: ${shown.join('; ')}${more}. Keep them open unless this message answers them.`
+}
+
+// Work handed to workers or other sessions often finishes in a later turn, and then nothing
+// reminds Claude to close it. Lists this chat's requests in progress with no update for a while.
+// Outside Orca there is no chat to match, so it lists all of them.
+function staleInThisChat() {
+  let data
+  try {
+    data = read()
+  } catch {
+    return ''
+  }
+  const origin = originFromEnv()
+  const stale = data.items
+    .filter((i) => isStale(i) && (!origin || sameChat(i.origin, origin)))
+    .sort((a, b) => a.updated.localeCompare(b.updated))
+  if (!stale.length) return ''
+  const shown = stale.slice(0, 5).map((i) => `[${i.id}] ${i.title.length > 50 ? i.title.slice(0, 47) + '…' : i.title}`)
+  const more = stale.length > 5 ? `, and ${stale.length - 5} more` : ''
+  return `[requests] In progress with no update for over ${STALE_MINUTES} min: ${shown.join('; ')}${more}. Close the ones that are done; leave the rest.`
 }

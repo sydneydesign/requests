@@ -4,6 +4,9 @@ import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 
+// The file stores these short codes. The CLI takes the long names (needs-you, working, queued,
+// done) and the aliases below; people see STATUS_NAME. Both plugins read the file, so the
+// codes stay as they are: renaming them would break a panel that has not been updated yet.
 export const STATUSES = ['need', 'run', 'queue', 'done']
 
 export const STATUS_NAME = {
@@ -260,4 +263,11 @@ export function count(data) {
   const n = { need: 0, run: 0, queue: 0, done: 0 }
   for (const i of data.items) if (n[i.status] !== undefined) n[i.status]++
   return n
+}
+
+// In progress and untouched for longer than this: probably finished and never closed.
+export const STALE_MINUTES = 30
+
+export function isStale(item, at = Date.now()) {
+  return item.status === 'run' && at - Date.parse(item.updated) > STALE_MINUTES * 60_000
 }
