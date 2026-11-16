@@ -1,6 +1,6 @@
 // Orca panel: draws the list the worker hands it and asks the worker for changes.
-// Open: what needs you first, then what's in progress by thread, then what got done today.
-// Done: everything finished, grouped by day.
+// One line per request. Grouped by project (status shown as each row's icon, sorted Needs you,
+// In progress, Queued) or by status (tinted bands, project as a chip). The display menu switches.
 ;(function () {
   const ORDER = { need: 0, run: 1, queue: 2, done: 3 }
   const NAME = { need: 'Needs you', run: 'In progress', queue: 'Queued', done: 'Done' }
@@ -8,13 +8,14 @@
 
   const view = {
     snapshot: null,
-    tab: 'open',
+    group: 'project', // 'project' or 'status'
+    doneRange: 'today', // 'today' or 'all'
     project: '',
     query: '',
+    searchOpen: false,
     expanded: null,
-    collapsed: new Set(),
-    collapsedProjects: new Set(),
-    showToday: false,
+    collapsed: new Set(), // project or status groups the user closed
+    openDone: new Set(), // groups whose done requests are showing
     confirming: null,
     changed: new Set()
   }
@@ -22,21 +23,16 @@
 
   try {
     const saved = JSON.parse(localStorage.getItem('requests.view') || '{}')
-    if (saved.tab === 'open' || saved.tab === 'done') view.tab = saved.tab
+    if (saved.group === 'project' || saved.group === 'status') view.group = saved.group
+    if (saved.doneRange === 'today' || saved.doneRange === 'all') view.doneRange = saved.doneRange
     if (typeof saved.project === 'string') view.project = saved.project
-    if (typeof saved.showToday === 'boolean') view.showToday = saved.showToday
-    if (Array.isArray(saved.collapsedProjects)) view.collapsedProjects = new Set(saved.collapsedProjects)
+    if (Array.isArray(saved.collapsed)) view.collapsed = new Set(saved.collapsed)
   } catch {}
   function remember() {
     try {
       localStorage.setItem(
         'requests.view',
-        JSON.stringify({
-          tab: view.tab,
-          project: view.project,
-          showToday: view.showToday,
-          collapsedProjects: [...view.collapsedProjects]
-        })
+        JSON.stringify({ group: view.group, doneRange: view.doneRange, project: view.project, collapsed: [...view.collapsed] })
       )
     } catch {}
   }
@@ -58,38 +54,21 @@
 
   // ---------- Dates
   const sameDay = (a, b) => a.toDateString() === b.toDateString()
-  function yesterday() {
-    const d = new Date()
-    d.setDate(d.getDate() - 1)
-    return d
-  }
+  const isToday = (iso) => sameDay(new Date(iso), new Date())
+  // Short relative time for the row's right edge; a date after a week.
   function when(iso) {
     const t = Date.parse(iso)
     if (!t) return ''
     const min = Math.round((Date.now() - t) / 60000)
     if (min < 1) return 'now'
-    if (min < 60) return `${min} min ago`
-    const d = new Date(t)
-    if (sameDay(d, new Date())) return d.toLocaleTimeString(LOCALE, { hour: '2-digit', minute: '2-digit' })
-    if (sameDay(d, yesterday())) return 'yesterday'
-    return d.toLocaleDateString(LOCALE, { day: 'numeric', month: 'short' })
-  }
-  function dayLabel(iso) {
-    const d = new Date(iso)
-    if (sameDay(d, new Date())) return 'Today'
-    if (sameDay(d, yesterday())) return 'Yesterday'
-    return d.toLocaleDateString(LOCALE, { weekday: 'long', day: 'numeric', month: 'long' })
+    if (min < 60) return `${min}m`
+    if (min < 1440) return `${Math.round(min / 60)}h`
+    if (min < 7 * 1440) return `${Math.round(min / 1440)}d`
+    return new Date(t).toLocaleDateString(LOCALE, { day: 'numeric', month: 'short' })
   }
   // Same rule as the store: in progress with no update for over 30 min. Probably done and never closed.
   const STALE_MINUTES = 30
   const isStale = (i) => i.status === 'run' && Date.now() - Date.parse(i.updated) > STALE_MINUTES * 60000
-  function idleFor(iso) {
-    const min = Math.round((Date.now() - Date.parse(iso)) / 60000)
-    if (min < 60) return `${min} min`
-    if (min < 1440) return `${Math.round(min / 60)} h`
-    return `${Math.round(min / 1440)} d`
-  }
-  const isToday = (iso) => sameDay(new Date(iso), new Date())
 
   // ---------- Filtering
   function threadOf(item) {
@@ -104,42 +83,67 @@
     return [i.title, i.said, i.answer, i.question, i.via, t.topic, t.project].join(' ').toLowerCase().includes(view.query)
   }
   const newest = (a, b) => b.updated.localeCompare(a.updated)
+  const byStatus = (a, b) => ORDER[a.status] - ORDER[b.status] || newest(a, b)
+  const isOpen = (i) => i.status !== 'done'
+  const inRange = (i) => view.doneRange === 'all' || isToday(i.updated)
   // Same rule as the store: Claude changed it after the user last saw it.
   const isUnread = (i) => Boolean(i.changed) && (!i.seen || i.seen < i.changed)
+  // A search opens everything, so matches are never hidden.
+  const isClosed = (key) => view.collapsed.has(key) && !view.query
+  const showsDone = (key) => view.openDone.has(key) || Boolean(view.query)
 
   // ---------- Pieces
+  const chevron = () =>
+    `<svg class="chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M4 6l4 4 4-4"/></svg>`
+  const icon = (s, small) => `<span class="status ${s}${small ? ' sm' : ''}" role="img" aria-label="${NAME[s]}"></span>`
+  const counts = (items) => {
+    const n = { need: 0, run: 0, queue: 0 }
+    for (const i of items) if (i.status in n) n[i.status]++
+    return ['need', 'run', 'queue'].filter((s) => n[s]).map((s) => `<span title="${NAME[s]}">${icon(s, true)}${n[s]}</span>`).join('')
+  }
+
   // Takes you to the request's chat when it knows which one; otherwise copies the reference.
   function replyButton(i, primary) {
     const label = i.origin ? 'Go to chat' : 'Copy reference'
     return `<button class="${primary ? 'primary' : ''}" data-action="goto">${label}</button>`
   }
-  function row(i, { meta, card } = {}) {
+
+  // One request: icon, title on one line, then one line of context (Claude's question in
+  // orange, or the thread and who is on it). On the right, Reply for a question, else the time.
+  function row(i, { chip } = {}) {
     const open = view.expanded === i.id
-    return `<button class="row" data-action="expand" aria-expanded="${open}">
-      <span class="status ${esc(i.status)}" role="img" aria-label="${NAME[i.status] || ''}"></span>
-      <span>
-        <span class="title">${esc(i.title)}</span>
-        ${meta ? `<span class="meta">${esc(meta)}</span>` : ''}
-        ${!card && i.status === 'done' && i.answer && !open ? `<span class="preview">${esc(i.answer)}</span>` : ''}
+    const t = threadOf(i)
+    const stale = isStale(i)
+    const second =
+      i.status === 'need' && i.question
+        ? `<span class="q">${esc(i.question)}</span>`
+        : `<span class="meta">${[t.topic, i.via].filter(Boolean).map(esc).join(' · ')}</span>`
+    const right =
+      i.status === 'need' && !open
+        ? `<button class="reply" data-action="goto">Reply</button>`
+        : `<span class="when${stale ? ' stale' : ''}"${stale ? ' title="No update from Claude in a while. Mark it done if it is finished."' : ''}>${stale ? `idle ${when(i.updated)}` : when(i.updated)}</span>`
+    return `<div class="row" data-action="expand" role="button" tabindex="0" aria-expanded="${open}">
+      ${icon(i.status)}
+      <span class="body">
+        <span class="title">${isUnread(i) ? '<span class="new-dot" role="img" aria-label="New update"></span>' : ''}${esc(i.title)}${chip ? `<span class="chip">${esc(t.project)}</span>` : ''}</span>
+        ${second}
       </span>
-      <span class="when${isStale(i) ? ' stale' : ''}"${isStale(i) ? ' title="No update from Claude in a while. Mark it done if it is finished."' : ''}>${isUnread(i) ? '<span class="new-dot" role="img" aria-label="New"></span>' : ''}${isStale(i) ? `idle ${idleFor(i.updated)}` : when(i.updated)}</span>
-    </button>`
+      ${right}
+    </div>`
   }
 
   function actions(i) {
     const confirming = view.confirming === i.id
-    const waiting = i.status === 'need'
     return `<div class="actions">
-      ${waiting ? replyButton(i, true) : ''}
+      ${replyButton(i, i.status === 'need')}
       ${i.status === 'done' ? `<button data-action="reopen">Reopen</button>` : `<button data-action="done">Mark done</button>`}
-      ${waiting ? '' : replyButton(i, false)}
       <button data-action="remove" class="${confirming ? 'confirm' : ''}">${confirming ? 'Sure? Remove' : 'Remove'}</button>
     </div>`
   }
 
-  function detail(i, { noQuestion } = {}) {
+  function detail(i) {
     return `<div class="detail">
-      ${i.question && !noQuestion ? `<h4>Claude asks</h4><p>${esc(i.question)}</p>` : ''}
+      ${i.question ? `<h4>Claude asks</h4><p>${esc(i.question)}</p>` : ''}
       ${i.said ? `<h4>What you said</h4><p class="said">${esc(i.said)}</p>` : ''}
       ${i.answer ? `<h4>Answer</h4><p>${esc(i.answer)}</p>` : ''}
       ${i.via ? `<h4>Who's on it</h4><p>${esc(i.via)}</p>` : ''}
@@ -149,178 +153,94 @@
   }
 
   function item(i, options = {}) {
-    const classes = [
-      'item',
-      view.expanded === i.id ? 'open' : '',
-      i.status === 'done' ? 'is-done' : '',
-      isUnread(i) ? 'unread' : '',
-      view.changed.has(i.id) ? 'changed' : ''
-    ]
-    return `<div class="${classes.join(' ')}" data-id="${esc(i.id)}">${row(i, options)}${detail(i)}</div>`
-  }
-
-  function card(i) {
-    const t = threadOf(i)
     const open = view.expanded === i.id
-    const classes = ['card', open ? 'open' : '', isUnread(i) ? 'unread' : '', view.changed.has(i.id) ? 'changed' : '']
-    return `<div class="${classes.join(' ')}" data-id="${esc(i.id)}">
-      ${row(i, { meta: t.topic, card: true })}
-      ${i.question ? `<p class="question">${esc(i.question)}</p>` : ''}
-      ${open
-        ? detail(i, { noQuestion: true })
-        : `<div class="actions">${replyButton(i, true)}<button data-action="done">Mark done</button></div>`}
-    </div>`
-  }
-
-  const chevron = (style = '') =>
-    `<svg class="chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true" style="${style}"><path d="M4 6l4 4 4-4"/></svg>`
-
-  function thread(t, items) {
-    const collapsed = view.collapsed.has(t.id)
-    return `<section class="thread ${collapsed ? 'collapsed' : ''}" data-thread="${esc(t.id)}">
-      <button class="thread-head" data-action="collapse" aria-expanded="${!collapsed}">
-        ${chevron()}
-        <span class="thread-name"><b>${esc(t.topic)}</b></span>
-        <span class="count" aria-label="${items.length} in progress">${items.length}</span>
-      </button>
-      <div class="items">${items.map((i) => item(i, { meta: i.via })).join('')}</div>
-    </section>`
+    const classes = ['item', open ? 'open' : '', i.status === 'done' ? 'is-done' : '', isUnread(i) ? 'unread' : '', view.changed.has(i.id) ? 'changed' : '']
+    return `<div class="${classes.join(' ')}" data-id="${esc(i.id)}">${row(i, options)}${open ? detail(i) : ''}</div>`
   }
 
   // ---------- Drawing
   function drawHeader(all) {
-    const n = { need: 0, moving: 0, done: 0 }
-    for (const i of all) {
-      if (i.status === 'need') n.need++
-      else if (i.status === 'done') n.done++
-      else n.moving++
-    }
-    const needs = n.need ? `<span class="need">${n.need} need${n.need > 1 ? '' : 's'} you</span>` : ''
-    let sentence
-    if (n.need && n.moving) sentence = `${needs}, ${n.moving} in progress`
-    else if (n.need) sentence = needs
-    else if (n.moving) sentence = `${n.moving} in progress, nothing waiting on you`
-    else sentence = `<span class="calm">All clear</span>`
-    const fresh = all.filter(isUnread).length
-    if (fresh) sentence += `<span class="calm">, ${fresh} new</span>`
-    $('summary').innerHTML = sentence
+    $('summary').innerHTML = `<span class="ttl">Requests</span><span class="counts">${counts(all)}</span>`
 
     const projects = [...new Set(view.snapshot.data.threads.map((t) => t.project))].sort((a, b) => a.localeCompare(b))
     if (view.project && !projects.includes(view.project)) view.project = ''
     $('project').innerHTML =
-      `<option value="">All</option>` +
+      `<option value="">All projects</option>` +
       projects.map((p) => `<option ${p === view.project ? 'selected' : ''} value="${esc(p)}">${esc(p)}</option>`).join('')
-
-    $('tabs').innerHTML = [
-      ['open', 'Open', n.need + n.moving],
-      ['done', 'Done', n.done]
-    ]
-      .map(([k, label, c]) => `<button role="tab" data-tab="${k}" aria-selected="${view.tab === k}">${label}<span class="n">${c}</span></button>`)
-      .join('')
+    document.querySelectorAll('[data-group]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.group === view.group)))
+    document.querySelectorAll('[data-done]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.done === view.doneRange)))
+    // A dot on the display button when the view is not the default one.
+    $('displaybtn')?.classList.toggle('changed-view', view.group !== 'project' || view.doneRange !== 'today' || Boolean(view.project))
   }
 
-  // In-progress requests of one project, grouped by thread, most recently touched first.
-  function threads(moving) {
-    const byThread = new Map()
-    for (const i of moving) {
-      if (!byThread.has(i.thread)) byThread.set(i.thread, [])
-      byThread.get(i.thread).push(i)
-    }
-    const groups = [...byThread.values()].map((items) => ({
-      t: threadOf(items[0]),
-      items: items.sort((a, b) => ORDER[a.status] - ORDER[b.status] || newest(a, b))
-    }))
-    groups.sort((a, b) => b.items[0].updated.localeCompare(a.items[0].updated))
-    return groups.map((g) => thread(g.t, g.items)).join('')
+  function doneLine(key, done) {
+    if (!done.length) return ''
+    const showing = showsDone(key)
+    const label = `${done.length} done${view.doneRange === 'today' ? ' today' : ''}`
+    return `<button class="done-line" data-action="toggle-done" data-key="${esc(key)}" aria-expanded="${showing}">${icon('done', true)}<span>${label}</span>${chevron()}</button>
+      ${showing ? done.sort(newest).map((i) => item(i)).join('') : ''}`
   }
 
-  function projectSummary(need, moving) {
-    const parts = []
-    if (need) parts.push(`<span class="need">${need} need${need > 1 ? '' : 's'} you</span>`)
-    if (moving) parts.push(`${moving} in progress`)
-    return parts.join(', ')
-  }
-
-  // Open tab: one group per project. Inside each, what needs the user first, then threads in
-  // progress. Projects with something waiting on the user come first. With a project picked in
-  // the filter there is only one group, so it goes without a header.
-  function drawOpen(all) {
-    const visible = all.filter(matches)
-    const open = visible.filter((i) => i.status !== 'done')
-    const today = visible.filter((i) => i.status === 'done' && isToday(i.updated)).sort(newest)
-    let html = ''
-
+  // By project: projects with something waiting on you first, then open work, then done only.
+  // Inside, rows sorted Needs you, In progress, Queued; done folds into one line.
+  function drawByProject(visible) {
     const byProject = new Map()
-    for (const i of open) {
+    for (const i of visible) {
       const p = threadOf(i).project
       if (!byProject.has(p)) byProject.set(p, [])
       byProject.get(p).push(i)
     }
-    const projects = [...byProject.entries()].map(([name, items]) => ({
-      name,
-      need: items.filter((i) => i.status === 'need').sort(newest),
-      moving: items.filter((i) => i.status === 'run' || i.status === 'queue'),
-      latest: items.reduce((m, i) => (i.updated > m ? i.updated : m), '')
-    }))
-    projects.sort((a, b) => (b.need.length > 0) - (a.need.length > 0) || b.latest.localeCompare(a.latest))
-
-    const withHeaders = !view.project
-    for (const p of projects) {
-      const body = p.need.map(card).join('') + threads(p.moving)
-      if (!withHeaders) {
-        html += body
-        continue
-      }
-      const collapsed = view.collapsedProjects.has(p.name) && !view.query
-      html += `<section class="project ${collapsed ? 'collapsed' : ''}" data-project="${esc(p.name)}">
-        <button class="project-head" data-action="collapse-project" aria-expanded="${!collapsed}">
-          ${chevron()}
-          <span><span class="project-name">${esc(p.name)}</span><span class="project-sum">${projectSummary(p.need.length, p.moving.length)}</span></span>
-        </button>
-        <div class="project-body">${body}</div>
-      </section>`
-    }
-
-    if (!open.length) {
-      html += view.query
-        ? `<div class="empty"><b>Nothing open matches “${esc(view.query)}”</b>Try the Done tab.</div>`
-        : `<div class="empty"><b>Nothing open</b>Everything you asked for is done.</div>`
-    }
-
-    if (today.length) {
-      const open = view.showToday || Boolean(view.query)
-      html += `<button class="section" data-action="toggle-today" aria-expanded="${open}">Done today <span class="n">${today.length}</span>${chevron(open ? '' : 'transform:rotate(-90deg)')}</button>`
-      if (open) {
-        html += today
-          .map((i) => {
-            const t = threadOf(i)
-            return item(i, { meta: view.project ? t.topic : `${t.topic} (${t.project})` })
-          })
-          .join('')
-      }
-    }
-    return html
+    const rank = (items) => (items.some((i) => i.status === 'need') ? 0 : items.some(isOpen) ? 1 : 2)
+    const latest = (items) => items.reduce((m, i) => (i.updated > m ? i.updated : m), '')
+    const projects = [...byProject.entries()]
+      .filter(([, items]) => items.some((i) => isOpen(i) || inRange(i)))
+      .sort(([, a], [, b]) => rank(a) - rank(b) || latest(b).localeCompare(latest(a)))
+    return projects
+      .map(([name, items]) => {
+        const key = `p:${name}`
+        const body =
+          items.filter(isOpen).sort(byStatus).map((i) => item(i)).join('') +
+          doneLine(key, items.filter((i) => !isOpen(i) && inRange(i)))
+        // With one project picked in the filter, it goes without a header.
+        if (view.project) return `<section class="project">${body}</section>`
+        const closed = isClosed(key)
+        return `<section class="project ${closed ? 'collapsed' : ''}">
+          <button class="project-head" data-action="collapse" data-key="${esc(key)}" aria-expanded="${!closed}">
+            ${chevron()}<span class="project-name">${esc(name)}</span><span class="counts">${counts(items)}</span>
+          </button>
+          ${closed ? '' : body}
+        </section>`
+      })
+      .join('')
   }
 
-  function drawDone(all) {
-    const done = all.filter((i) => i.status === 'done' && matches(i)).sort(newest)
-    if (!done.length) {
+  // By status: one band per status, the project as a chip on each row. Done starts closed.
+  function drawByStatus(visible) {
+    return ['need', 'run', 'queue', 'done']
+      .map((s) => {
+        const these = visible.filter((i) => i.status === s && (s !== 'done' || inRange(i))).sort(newest)
+        if (!these.length) return ''
+        const key = `s:${s}`
+        const closed = s === 'done' ? !showsDone(key) : isClosed(key)
+        const label = `${NAME[s]}${s === 'done' && view.doneRange === 'today' ? ' today' : ''}`
+        return `<section class="band-group ${closed ? 'collapsed' : ''}">
+          <button class="band" data-action="${s === 'done' ? 'toggle-done' : 'collapse'}" data-key="${key}" aria-expanded="${!closed}">
+            ${icon(s, true)}<span>${label}</span><span class="n">${these.length}</span>${chevron()}
+          </button>
+          ${closed ? '' : these.map((i) => item(i, { chip: !view.project })).join('')}
+        </section>`
+      })
+      .join('')
+  }
+
+  function drawList(all) {
+    const visible = all.filter(matches)
+    if (!visible.some((i) => isOpen(i) || inRange(i))) {
       return view.query
-        ? `<div class="empty"><b>Nothing done matches “${esc(view.query)}”</b></div>`
-        : `<div class="empty"><b>Nothing done yet</b>What Claude finishes shows up here, by day.</div>`
+        ? `<div class="empty"><b>Nothing matches “${esc(view.query)}”</b></div>`
+        : `<div class="empty"><b>All clear</b>Nothing open${view.doneRange === 'today' ? ', and nothing done today' : ''}.</div>`
     }
-    let html = ''
-    let currentDay = null
-    for (const i of done) {
-      const d = dayLabel(i.updated)
-      if (d !== currentDay) {
-        html += `<h2 class="section">${esc(d)}</h2>`
-        currentDay = d
-      }
-      const t = threadOf(i)
-      html += item(i, { meta: view.project ? t.topic : `${t.topic} (${t.project})` })
-    }
-    return html
+    return view.group === 'status' ? drawByStatus(visible) : drawByProject(visible)
   }
 
   function draw() {
@@ -331,7 +251,7 @@
     if (!view.snapshot.data.items.length) {
       html += `<div class="empty"><b>No requests yet</b>Talk to Claude as usual. When one message asks for several things, they show up here, split by topic.</div>`
     } else {
-      html += view.tab === 'done' ? drawDone(all) : drawOpen(all)
+      html += drawList(all)
     }
     $('list').innerHTML = html
   }
@@ -384,22 +304,76 @@
   }
 
   // ---------- Interaction
-  $('tabs').addEventListener('click', (e) => {
-    const b = e.target.closest('[data-tab]')
-    if (!b) return
-    view.tab = b.dataset.tab
-    view.expanded = null
-    remember()
+  // Search hides behind an icon, as in Cursor. Escape clears and closes it.
+  function setSearch(open) {
+    view.searchOpen = open
+    $('searchrow').hidden = !open
+    $('searchbtn').setAttribute('aria-expanded', String(open))
+    if (open) $('search').focus()
+    else if (view.query) {
+      $('search').value = ''
+      view.query = ''
+      draw()
+    }
+  }
+  $('searchbtn')?.addEventListener('click', () => setSearch(!view.searchOpen))
+  $('search').addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') setSearch(false)
+  })
+  $('search').addEventListener('input', (e) => {
+    view.query = e.target.value.trim().toLowerCase()
     draw()
+  })
+
+  // Display menu: grouping, project and how much of Done to show.
+  function setMenu(open) {
+    $('displaymenu').hidden = !open
+    $('displaybtn').setAttribute('aria-expanded', String(open))
+  }
+  $('displaybtn')?.addEventListener('click', (e) => {
+    e.stopPropagation()
+    setMenu($('displaymenu').hidden)
+  })
+  $('displaymenu')?.addEventListener('click', (e) => {
+    e.stopPropagation()
+    const g = e.target.closest('[data-group]')
+    const d = e.target.closest('[data-done]')
+    if (g) view.group = g.dataset.group
+    if (d) view.doneRange = d.dataset.done
+    if (g || d) {
+      view.openDone.clear()
+      remember()
+      draw()
+    }
+  })
+  document.addEventListener('click', () => {
+    if ($('displaymenu') && !$('displaymenu').hidden) setMenu(false)
+  })
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && $('displaymenu') && !$('displaymenu').hidden) setMenu(false)
   })
   $('project').addEventListener('change', (e) => {
     view.project = e.target.value
     remember()
     draw()
   })
-  $('search').addEventListener('input', (e) => {
-    view.query = e.target.value.trim().toLowerCase()
-    draw()
+
+  // The board tab (orca/board). Only in the sidebar: the board's own List view hides this switch.
+  $('openboard')?.addEventListener('click', async () => {
+    try {
+      const r = await ask('requests.openBoard')
+      if (!r?.opened) toast(`Couldn't open the board. ${r?.error || ''}`.trim())
+    } catch (error) {
+      toast(`Couldn't open the board: ${error.message}`)
+    }
+  })
+
+  // Rows are divs with role=button (they hold a Reply button), so Enter and Space open them.
+  $('list').addEventListener('keydown', (e) => {
+    if ((e.key === 'Enter' || e.key === ' ') && e.target.matches('.row[role="button"]')) {
+      e.preventDefault()
+      e.target.click()
+    }
   })
 
   let confirmTimer = null
@@ -407,23 +381,18 @@
     const b = e.target.closest('[data-action]')
     if (!b) return
     const action = b.dataset.action
-    const threadId = b.closest('[data-thread]')?.dataset.thread
     const id = b.closest('[data-id]')?.dataset.id
     const current = id ? view.snapshot.data.items.find((i) => i.id === id) : null
 
     if (action === 'collapse') {
-      view.collapsed.has(threadId) ? view.collapsed.delete(threadId) : view.collapsed.add(threadId)
-      return draw()
-    }
-    if (action === 'collapse-project') {
-      const name = b.closest('[data-project]')?.dataset.project
-      view.collapsedProjects.has(name) ? view.collapsedProjects.delete(name) : view.collapsedProjects.add(name)
+      const key = b.dataset.key
+      view.collapsed.has(key) ? view.collapsed.delete(key) : view.collapsed.add(key)
       remember()
       return draw()
     }
-    if (action === 'toggle-today') {
-      view.showToday = !view.showToday
-      remember()
+    if (action === 'toggle-done') {
+      const key = b.dataset.key
+      view.openDone.has(key) ? view.openDone.delete(key) : view.openDone.add(key)
       return draw()
     }
     if (action === 'expand') {
@@ -496,6 +465,6 @@
     }
   }
   listen('requests.changed', receive)
-  setInterval(draw, 60000) // keeps "3 min ago" fresh
+  setInterval(draw, 60000) // keeps "3m" fresh
   load()
 })()

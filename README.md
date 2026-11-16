@@ -46,9 +46,19 @@ Everything stays on your computer. There are no dependencies to install.
 ## Usage
 
 - Talk to Claude as usual. When it logs something, it adds a line like `→ 2 requests logged: Pricing page (1), Login bug (1)`.
-- Open the flag icon in Orca's right sidebar. Requests are grouped by project, and anything that needs you is listed first.
+- Open the flag icon in Orca's right sidebar. Requests are grouped by project. Inside each project, what needs you comes first, then what is in progress, then what is queued. Done requests fold into one line per project.
+- Use the display button (the sliders icon) to group by status instead, pick one project, or show all done requests instead of today's.
 - New updates from Claude show in bold with a dot. They count as read once you open them in the panel or write in the chat they came from.
 - To answer one, press **Go to chat**. Orca switches to the chat the request came from and copies its reference, so you can paste it and write after it: `[k3fp] the second option`. When you answer, Claude moves the request on.
+
+### Board
+
+Press **Board** at the top of the panel to open the requests in a full-width tab, with a **Board** view (one column per status) and a **List** view (the panel at full width).
+
+- Orca opens the board on `~/.requests/requests.json`. The first time, Orca adds `~/.requests` as a folder workspace in the left sidebar. The board never edits the file directly.
+- Click a card to see what you said and Claude's last answer, with **Go to chat** and **Mark done**.
+- A done request stays on the board while the chat it came from is open in Orca. **Clear** hides every done request on the board. The panel keeps them all: set Done to All in its display menu.
+- Close the right sidebar to give the board the full width. In a narrow tab, the columns snap and "Needs you" stays pinned on the left.
 
 | Status | Meaning |
 | --- | --- |
@@ -90,6 +100,8 @@ Load this folder in both apps:
 - **Claude Code:** `claude plugin marketplace add <folder>`, then `claude plugin install requests@requests`.
 
 Orca reloads the plugin when its files change. `node claude/bin/requests.mjs help` lists the commands Claude uses.
+
+`dev/board-harness.html` renders the board and panel against test data in any browser, without Orca. Use `?data=demo|worst|empty|one|huge`, `&theme=light|dark` and `&view=board|list`. It is not part of the plugin.
 
 ## License
 

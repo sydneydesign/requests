@@ -1,0 +1,190 @@
+<!doctype html>
+<!--
+  Dev only, not part of the plugin (the manifest never references it).
+  Renders the real board and panel code against fixtures, with a fake Orca bridge, so worst-case
+  data can be checked in a browser without touching ~/.requests.
+
+  URL params: data=demo|worst|empty|one|huge  view=board|list  theme=light|dark  open=<id>
+-->
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Board harness</title>
+  <link rel="stylesheet" href="../orca/panel/panel.css">
+  <link rel="stylesheet" href="../orca/board/board.css">
+  <style>
+    /* Stand-ins for the --orca-* variables Orca injects. */
+    :root.light { --orca-background: #ffffff; --orca-foreground: #0a0a0a; --orca-muted: #f4f4f5; --orca-muted-foreground: #71717a; --orca-border: #e4e4e7; --orca-accent: #f4f4f5; }
+    :root.dark { --orca-background: #0a0a0a; --orca-foreground: #fafafa; --orca-muted: #1f1f1f; --orca-muted-foreground: #a1a1aa; --orca-border: #27272a; --orca-accent: #1f1f1f; }
+    .harness-toggle {
+      position: fixed; bottom: 12px; left: 50%; transform: translateX(-50%); z-index: 99;
+      display: flex; gap: 2px; padding: 2px; background: #e5e5e5; border-radius: 8px;
+      font: 12px/1 system-ui, sans-serif;
+    }
+    .harness-toggle a { padding: 6px 10px; border-radius: 6px; color: #333; text-decoration: none; }
+    .harness-toggle a.on { background: #fff; color: #000; }
+  </style>
+  <script>
+    const params = new URLSearchParams(location.search)
+    const DATA = params.get('data') || 'worst'
+    const THEME = params.get('theme') || 'dark'
+    document.documentElement.classList.add(THEME)
+    try { localStorage.setItem('requests.board', JSON.stringify({ mode: params.get('view') || 'board' })) } catch {}
+    try { localStorage.setItem('requests.view', JSON.stringify({ group: params.get('group') || 'project' })) } catch {}
+
+    const now = Date.now()
+    const ago = (min) => new Date(now - min * 60000).toISOString()
+    const T = (id, topic, project) => ({ id, topic, project, created: ago(9999), updated: ago(1) })
+    const I = (id, thread, status, title, more = {}) => ({
+      id, thread, status, title, said: '', answer: '', question: '', files: [], via: '',
+      origin: { terminal: 'term_open' }, created: ago(60), updated: ago(5), changed: null, seen: null, ...more
+    })
+
+    const demo = {
+      threads: [T('t1', 'Pricing page', 'Web'), T('t2', 'Login bug', 'App')],
+      items: [
+        I('k3fp', 't1', 'need', 'Pick the hero layout', { question: 'Option A or B?' }),
+        I('m2qa', 't2', 'run', 'Fix the redirect after login'),
+        I('p9zz', 't1', 'queue', 'Write the FAQ'),
+        I('a1b2', 't2', 'done', 'Reproduce the bug')
+      ]
+    }
+
+    // Realistic worst cases, at the store's own limits (store.mjs add(): thread 80, project 80,
+    // title 140, said 2000, answer 4000, question 2000, via 120).
+    const longTitle = 'Revisar la integración del webhook de pagos de Stripe con el panel de administración y corregir los reintentos duplicados en producción'
+    const longThread = 'Benachrichtigungseinstellungen und Datenschutzeinstellungen für alle Arbeitsbereiche'.slice(0, 80)
+    const longProject = 'Northwind Industries Holdings — Plataforma de clientes (migración 2026)'
+    const path = 'C:\\Users\\Sydney\\Documents\\Claude Code\\proyectos\\easy-one\\src\\components\\dashboard\\AdminSettingsPanel.tsx'
+    const longQuestion = '¿Quieres que mantenga la versión actual del componente de tabla mientras migro los filtros, o prefieres que lo sustituya entero por el de la librería y revisemos después las diferencias de espaciado en las tres vistas?\nSi lo sustituyo, se pierden los atajos de teclado que añadimos la semana pasada.'
+    const longAnswer = ('Moví la lógica de reintentos al worker, añadí una clave de idempotencia por evento y borré los duplicados que quedaban en la tabla de pagos. ').repeat(12).trim()
+    const worst = {
+      threads: [
+        T('t1', longThread, longProject),
+        T('t2', 'UI', 'X'),
+        T('t3', 'نور الهدى — إعدادات الحساب', 'Easy One'),
+        T('t4', 'Página de Fabien', 'Easy One')
+      ],
+      items: [
+        I('x6e5', 't1', 'need', longTitle, { question: longQuestion, said: longAnswer.slice(0, 600), changed: ago(1), updated: ago(0) }),
+        I('mm8x', 't2', 'need', 'Ok', { question: '' }),
+        I('q7w8e', 't1', 'run', 'Arreglar ' + path, { updated: ago(60 * 26), via: 'Worker designer-FAB-001-fix-spacing-and-grid-alignment-in-the-admin-panel' }),
+        I('r2d2', 't3', 'run', 'Cambiar <Button> por <Link> & limpiar **estilos** del header', { changed: ago(2) }),
+        I('s9s9', 't4', 'run', '🚀 Lanzar la beta 👩🏽‍💻 con el equipo', { updated: ago(60 * 24 * 400) }),
+        I('t0t0', 't2', 'queue', longTitle.replace('Stripe', 'Redsys'), { updated: new Date(now + 3 * 86400000).toISOString() }),
+        I('d1d1', 't1', 'done', longTitle, { answer: longAnswer }),
+        I('d2d2', 't2', 'done', 'Ok', { origin: null, updated: ago(1) }),
+        I('d3d3', 't4', 'done', path, { answer: 'Hecho.' })
+      ]
+    }
+    const empty = { threads: [], items: [] }
+    const one = { threads: [T('t1', 'Login bug', 'App')], items: [I('k3fp', 't1', 'need', 'Pick the hero layout', { question: 'Option A or B?', changed: ago(1) })] }
+    const huge = { threads: [], items: [] }
+    for (let n = 0; n < 40; n++) huge.threads.push(T('t' + n, 'Thread number ' + n, 'Project ' + (n % 6)))
+    const S = ['need', 'run', 'queue', 'done']
+    for (let n = 0; n < 1000; n++) huge.items.push(I('h' + n.toString(36).padStart(3, '0'), 't' + (n % 40), S[n % 4], 'Request ' + n + ' with a normal-length title', { updated: ago(n) }))
+
+    const fixtures = { demo, worst, empty, one, huge }
+    const data = { version: 2, ...fixtures[DATA] }
+    const snapshot = () => ({ data, error: null, file: 'fixture' })
+    const handlers = {
+      'requests.read': () => snapshot(),
+      'requests.openChats': () => ({ handles: ['term_open'] }),
+      'requests.seen': ({ id }) => { const i = data.items.find((x) => x.id === id); if (i) i.seen = new Date().toISOString(); return snapshot() },
+      'requests.update': ({ id, status }) => { const i = data.items.find((x) => x.id === id); if (i) { i.status = status; i.updated = new Date().toISOString() } return snapshot() },
+      'requests.goto': () => ({ snapshot: snapshot(), result: 'switched' }),
+      'requests.remove': ({ id }) => { data.items = data.items.filter((x) => x.id !== id); return snapshot() }
+    }
+    window.orca = {
+      plugin: { request: async (name, input) => handlers[name](input || {}), on: () => {} },
+      document: { get: async () => ({}) }
+    }
+  </script>
+</head>
+<body class="board-page">
+  <header class="bhead" id="bhead">
+    <h1 class="sr-only">Requests</h1>
+    <p class="summary bsummary" id="bsummary" aria-live="polite">Requests</p>
+    <div class="ptools" id="btools">
+      <button id="bsearchbtn" class="iconbtn" aria-label="Search" aria-expanded="false" title="Search">
+        <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true"><circle cx="7" cy="7" r="4.5" fill="none" stroke="currentColor" stroke-width="1.4"/><path d="M10.5 10.5L14 14" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>
+      </button>
+      <div class="menuwrap">
+        <button id="bdisplaybtn" class="iconbtn" aria-label="Display options" aria-expanded="false" aria-controls="bdisplaymenu" title="Display options">
+          <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true"><path d="M2 4h12M2 8h12M2 12h12" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/><circle cx="5" cy="4" r="1.7" fill="var(--bg)" stroke="currentColor" stroke-width="1.3"/><circle cx="11" cy="8" r="1.7" fill="var(--bg)" stroke="currentColor" stroke-width="1.3"/><circle cx="7" cy="12" r="1.7" fill="var(--bg)" stroke="currentColor" stroke-width="1.3"/></svg>
+        </button>
+        <div class="menu" id="bdisplaymenu" hidden>
+          <div class="menu-row"><label for="bproject">Project</label><select id="bproject"></select></div>
+          <div class="menu-row"><span>Done column</span><button class="menu-btn" data-action="clear">Clear it</button></div>
+        </div>
+      </div>
+    </div>
+    <div class="switch seg" role="tablist" aria-label="View">
+      <button role="tab" data-view="list">List</button>
+      <button role="tab" data-view="board">Board</button>
+    </div>
+    <div class="searchrow bsearchrow" id="bsearchrow" hidden>
+      <label class="sr-only" for="bsearch">Search the board</label>
+      <input id="bsearch" class="search" type="search" placeholder="Search requests">
+    </div>
+  </header>
+  <main id="main"></main>
+  <div id="listview" class="listview" hidden>
+    <div class="listcol">
+      <header class="head">
+        <div class="top">
+          <p class="summary" id="summary" aria-live="polite">Requests</p>
+          <div class="ptools">
+            <button id="searchbtn" class="iconbtn" aria-label="Search" aria-expanded="false" title="Search">
+              <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true"><circle cx="7" cy="7" r="4.5" fill="none" stroke="currentColor" stroke-width="1.4"/><path d="M10.5 10.5L14 14" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>
+            </button>
+            <div class="menuwrap">
+              <button id="displaybtn" class="iconbtn" aria-label="Display options" aria-expanded="false" aria-controls="displaymenu" title="Display options">
+                <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true"><path d="M2 4h12M2 8h12M2 12h12" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/><circle cx="5" cy="4" r="1.7" fill="var(--bg)" stroke="currentColor" stroke-width="1.3"/><circle cx="11" cy="8" r="1.7" fill="var(--bg)" stroke="currentColor" stroke-width="1.3"/><circle cx="7" cy="12" r="1.7" fill="var(--bg)" stroke="currentColor" stroke-width="1.3"/></svg>
+              </button>
+              <div class="menu" id="displaymenu" hidden>
+                <div class="menu-row"><span>Group by</span>
+                  <div class="seg small"><button data-group="project" aria-pressed="true">Project</button><button data-group="status" aria-pressed="false">Status</button></div>
+                </div>
+                <div class="menu-row"><label for="project">Project</label><select id="project"></select></div>
+                <div class="menu-row"><span>Done</span>
+                  <div class="seg small"><button data-done="today" aria-pressed="true">Today</button><button data-done="all" aria-pressed="false">All</button></div>
+                </div>
+              </div>
+            </div>
+            <div class="seg pswitch" role="tablist" aria-label="View">
+              <button role="tab" aria-selected="true">List</button>
+              <button role="tab" aria-selected="false" id="openboard" title="Open the board in a full-width tab">Board</button>
+            </div>
+          </div>
+        </div>
+        <div class="searchrow" id="searchrow" hidden>
+          <label class="sr-only" for="search">Search your requests</label>
+          <input id="search" class="search" type="search" placeholder="Search requests">
+        </div>
+      </header>
+      <main id="list"></main>
+    </div>
+  </div>
+  <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
+
+  <nav class="harness-toggle" id="harness"></nav>
+  <script>
+    document.getElementById('harness').innerHTML = ['demo', 'worst', 'empty', 'one', 'huge']
+      .map((d) => { const p = new URLSearchParams(location.search); p.set('data', d); return `<a href="?${p}" class="${d === DATA ? 'on' : ''}">${d}</a>` }).join('')
+  </script>
+  <script src="../orca/panel/panel.js"></script>
+  <script src="../orca/board/board.js"></script>
+  <script>
+    const open = params.get('open')
+    if (open) setTimeout(() => document.querySelector(`[data-id="${open}"] .row`)?.click(), 300)
+    if (params.get('menu')) setTimeout(() => document.getElementById('displaybtn')?.click(), 300)
+    // probe=1: writes the header's layout into the page, for headless checks with --dump-dom.
+    if (params.get('probe')) setTimeout(() => {
+      const r = (q) => { const b = document.querySelector(q).getBoundingClientRect(); return [q, Math.round(b.left), Math.round(b.top), Math.round(b.width)] }
+      document.body.insertAdjacentHTML('beforeend', `<pre id="probe">${JSON.stringify({ vw: innerWidth, rects: ['.bhead', '#bsummary', '#bproject', '.switch'].map(r) })}</pre>`)
+    }, 500)
+  </script>
+</body>
+</html>
