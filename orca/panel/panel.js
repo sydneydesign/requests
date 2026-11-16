@@ -1,5 +1,6 @@
 // Orca panel: draws the list the worker hands it and asks the worker for changes.
-// One line per request. Grouped by project (status shown as each row's icon, sorted Needs you,
+// Two views, switched with List | Board. Board: one column per status, a card per request.
+// List: one line per request. Grouped by project (status shown as each row's icon, sorted Needs you,
 // In progress, Queued) or by status (tinted bands, project as a chip). The display menu switches.
 ;(function () {
   const ORDER = { need: 0, run: 1, queue: 2, done: 3 }
@@ -8,6 +9,7 @@
 
   const view = {
     snapshot: null,
+    mode: 'list', // 'list' or 'board'
     group: 'project', // 'project' or 'status'
     doneRange: 'today', // 'today' or 'all'
     project: '',
@@ -23,6 +25,7 @@
 
   try {
     const saved = JSON.parse(localStorage.getItem('requests.view') || '{}')
+    if (saved.mode === 'list' || saved.mode === 'board') view.mode = saved.mode
     if (saved.group === 'project' || saved.group === 'status') view.group = saved.group
     if (saved.doneRange === 'today' || saved.doneRange === 'all') view.doneRange = saved.doneRange
     if (typeof saved.project === 'string') view.project = saved.project
@@ -32,7 +35,7 @@
     try {
       localStorage.setItem(
         'requests.view',
-        JSON.stringify({ group: view.group, doneRange: view.doneRange, project: view.project, collapsed: [...view.collapsed] })
+        JSON.stringify({ mode: view.mode, group: view.group, doneRange: view.doneRange, project: view.project, collapsed: [...view.collapsed] })
       )
     } catch {}
   }
@@ -167,6 +170,8 @@
     $('project').innerHTML =
       `<option value="">All projects</option>` +
       projects.map((p) => `<option ${p === view.project ? 'selected' : ''} value="${esc(p)}">${esc(p)}</option>`).join('')
+    document.querySelectorAll('[data-mode]').forEach((b) => b.setAttribute('aria-selected', String(b.dataset.mode === view.mode)))
+    $('grouprow')?.toggleAttribute('hidden', view.mode === 'board')
     document.querySelectorAll('[data-group]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.group === view.group)))
     document.querySelectorAll('[data-done]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.done === view.doneRange)))
     // A dot on the display button when the view is not the default one.
@@ -243,6 +248,49 @@
     return view.group === 'status' ? drawByStatus(visible) : drawByProject(visible)
   }
 
+  // ---------- Board: one column per status, after Cursor's project board
+  // A card: status icon, project and time on top; the title; one line of context (Claude's
+  // question in orange, or the thread). Reply when it needs you; it copies the [id] reference.
+  function bcard(i) {
+    const t = threadOf(i)
+    const open = view.expanded === i.id
+    const unread = isUnread(i)
+    const stale = isStale(i)
+    if (i.status === 'done' && !open) {
+      return `<div class="bcard item done slim" data-id="${esc(i.id)}">
+        <div class="face" data-action="expand" role="button" tabindex="0" aria-expanded="false" title="${esc(i.title)}">
+          ${icon('done', true)}<span class="t" dir="auto">${esc(i.title)}</span><span class="m">${when(i.updated)}</span>
+        </div>
+      </div>`
+    }
+    const context =
+      i.status === 'need' && i.question
+        ? `<span class="q" dir="auto">${esc(i.question)}</span>`
+        : `<span class="ctx" dir="auto" title="${esc(t.topic)}">${esc(t.topic)}</span>`
+    return `<div class="bcard item ${esc(i.status)} ${open ? 'open' : ''} ${unread ? 'unread' : ''} ${view.changed.has(i.id) ? 'changed' : ''}" data-id="${esc(i.id)}">
+      <div class="face" data-action="expand" role="button" tabindex="0" aria-expanded="${open}">
+        <span class="top">${icon(i.status, true)}<span class="proj" dir="auto" title="${esc(t.project)}">${esc(t.project)}</span>${unread ? '<span class="new-dot" role="img" aria-label="New update"></span>' : ''}<span class="m${stale ? ' stale' : ''}">${stale ? 'idle ' : ''}${when(i.updated)}</span></span>
+        <span class="t" dir="auto">${esc(i.title)}</span>
+        ${context}
+      </div>
+      ${i.status === 'need' && !open ? `<div class="cardfoot"><button class="reply" data-action="goto">Reply</button></div>` : ''}
+      ${open ? detail(i) : ''}
+    </div>`
+  }
+  function drawBoard(all) {
+    const visible = all.filter(matches)
+    return `<div class="cols">${['need', 'run', 'queue', 'done']
+      .map((s) => {
+        const these = visible.filter((i) => i.status === s && (s !== 'done' || inRange(i))).sort(newest)
+        const label = `${NAME[s]}${s === 'done' && view.doneRange === 'today' ? ' today' : ''}`
+        return `<section class="col" aria-label="${label}">
+          <h2>${icon(s, true)}<span>${label}</span><span class="n">${these.length}</span></h2>
+          <div class="cards">${these.map(bcard).join('') || `<p class="col-empty">${view.query ? 'No matches' : 'Nothing here'}</p>`}</div>
+        </section>`
+      })
+      .join('')}</div>`
+  }
+
   function draw() {
     if (!view.snapshot) return
     const all = inProject()
@@ -251,9 +299,14 @@
     if (!view.snapshot.data.items.length) {
       html += `<div class="empty"><b>No requests yet</b>Talk to Claude as usual. When one message asks for several things, they show up here, split by topic.</div>`
     } else {
-      html += drawList(all)
+      html += view.mode === 'board' ? drawBoard(all) : drawList(all)
     }
+    // Keep the board's sideways scroll across redraws.
+    const x = $('list').querySelector('.cols')?.scrollLeft || 0
     $('list').innerHTML = html
+    $('list').classList.toggle('is-board', view.mode === 'board')
+    const cols = $('list').querySelector('.cols')
+    if (cols) cols.scrollLeft = x
   }
 
   // ---------- What changed since last time
@@ -358,19 +411,19 @@
     draw()
   })
 
-  // The board tab (orca/board). Only in the sidebar: the board's own List view hides this switch.
-  $('openboard')?.addEventListener('click', async () => {
-    try {
-      const r = await ask('requests.openBoard')
-      if (!r?.opened) toast(`Couldn't open the board. ${r?.error || ''}`.trim())
-    } catch (error) {
-      toast(`Couldn't open the board: ${error.message}`)
-    }
+  // List | Board switches the panel between its two views, in place.
+  document.querySelector('.pswitch')?.addEventListener('click', (e) => {
+    const b = e.target.closest('[data-mode]')
+    if (!b || b.dataset.mode === view.mode) return
+    view.mode = b.dataset.mode
+    view.expanded = null
+    remember()
+    draw()
   })
 
-  // Rows are divs with role=button (they hold a Reply button), so Enter and Space open them.
+  // Rows and cards are divs with role=button (they hold a Reply button), so Enter and Space open them.
   $('list').addEventListener('keydown', (e) => {
-    if ((e.key === 'Enter' || e.key === ' ') && e.target.matches('.row[role="button"]')) {
+    if ((e.key === 'Enter' || e.key === ' ') && e.target.matches('.row[role="button"], .face[role="button"]')) {
       e.preventDefault()
       e.target.click()
     }

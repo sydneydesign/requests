@@ -22,12 +22,19 @@
   --pill: var(--bg);
   --pill-line: var(--line);
 
+  /* Board: cards on a grey column in light mode; in dark, the column stays near the background
+     and cards are lifted one step, so they read as raised instead of as holes. */
+  --col: var(--bg-2);
+  --card: var(--bg);
+  --card-line: var(--line);
+  --card-hover: var(--muted);
+
   /* Motion: one strong ease-out for UI feedback (Emil Kowalski's curve). */
   --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
 }
-:root.dark { --need: #f0a43a; --run: #7aa7ff; --queue: #8f8f88; --done: #5fcf8a; --pill: color-mix(in srgb, var(--text) 16%, var(--bg)); --pill-line: color-mix(in srgb, var(--text) 22%, var(--bg)); }
+:root.dark { --need: #f0a43a; --run: #7aa7ff; --queue: #8f8f88; --done: #5fcf8a; --pill: color-mix(in srgb, var(--text) 16%, var(--bg)); --pill-line: color-mix(in srgb, var(--text) 22%, var(--bg)); --col: color-mix(in srgb, var(--text) 4%, var(--bg)); --card: color-mix(in srgb, var(--text) 9%, var(--bg)); --card-line: color-mix(in srgb, var(--text) 13%, var(--bg)); --card-hover: color-mix(in srgb, var(--text) 28%, var(--bg)); }
 @media (prefers-color-scheme: dark) {
-  :root:not(.light) { --need: #f0a43a; --run: #7aa7ff; --queue: #8f8f88; --done: #5fcf8a; --pill: color-mix(in srgb, var(--text) 16%, var(--bg)); --pill-line: color-mix(in srgb, var(--text) 22%, var(--bg)); }
+  :root:not(.light) { --need: #f0a43a; --run: #7aa7ff; --queue: #8f8f88; --done: #5fcf8a; --pill: color-mix(in srgb, var(--text) 16%, var(--bg)); --pill-line: color-mix(in srgb, var(--text) 22%, var(--bg)); --col: color-mix(in srgb, var(--text) 4%, var(--bg)); --card: color-mix(in srgb, var(--text) 9%, var(--bg)); --card-line: color-mix(in srgb, var(--text) 13%, var(--bg)); --card-hover: color-mix(in srgb, var(--text) 28%, var(--bg)); }
 }
 
 * { box-sizing: border-box; }
@@ -92,7 +99,7 @@ select { padding: 0 4px; color: var(--text); }
   background: var(--pill); border: 1px solid var(--pill-line); border-radius: 10px;
   box-shadow: 0 12px 32px rgb(0 0 0 / .28);
 }
-.menu[hidden] { display: none; }
+.menu[hidden], .menu-row[hidden] { display: none; }
 .menu-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 30px; font-size: var(--t-meta); }
 .menu-row select { max-width: 140px; }
 
@@ -187,6 +194,40 @@ main { padding: 4px 4px 72px; }
 @media (prefers-reduced-motion: reduce) { .reply:active { transform: none; } }
 .status.sm { width: 12px; height: 12px; margin-top: 0; flex: none; }
 .status.sm.need::after { font-size: 9px; }
+
+/* ---------- Board: one column per status ---------- */
+main.is-board { padding: 8px 0 72px; }
+.cols { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(240px, 1fr); gap: 8px; align-items: start; overflow-x: auto; padding: 0 8px 8px; scroll-snap-type: x proximity; scroll-padding-inline: 8px; }
+.col { min-width: 0; background: var(--col); border-radius: 10px; padding: 8px; scroll-snap-align: start; }
+.col h2 { display: flex; align-items: center; gap: 8px; margin: 2px 4px 8px; font-size: var(--t-body); line-height: var(--lh-body); font-weight: 600; }
+.col h2 .n { color: var(--muted); font-weight: 500; font-variant-numeric: tabular-nums; }
+.cards { display: flex; flex-direction: column; gap: 6px; }
+.col-empty { margin: 0; padding: 4px; color: var(--muted); font-size: var(--t-meta); }
+
+.bcard { background: var(--card); border: 1px solid var(--card-line); border-radius: 8px; }
+.bcard:hover, .bcard.open { border-color: var(--card-hover); }
+.bcard .face { display: grid; grid-template-columns: minmax(0, 1fr); gap: 2px; padding: 8px 10px; border-radius: 8px; cursor: pointer; }
+.bcard .top { display: flex; align-items: center; gap: 6px; color: var(--muted); font-size: var(--t-meta); line-height: 18px; }
+.bcard .top .proj { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.bcard .top .new-dot { margin: 0; flex: none; }
+.bcard .top .m { margin-left: auto; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.bcard .top .stale { color: var(--need); }
+.bcard .t { display: block; font-weight: 500; overflow-wrap: anywhere; }
+.bcard.unread .t { font-weight: 700; }
+.bcard .q, .bcard .ctx { font-size: var(--t-meta); line-height: 18px; min-width: 0; }
+.bcard .q { color: var(--need); }
+.bcard:not(.open) .q { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.bcard.open .q { display: none; }
+.bcard .ctx { display: block; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.bcard .cardfoot { padding: 0 10px 10px; }
+.bcard .detail { margin: 0; padding: 8px 10px 10px; border-top: 1px solid var(--card-line); }
+/* Done: one grey line each. */
+.bcard.slim { background: transparent; border-color: transparent; }
+.bcard.slim:hover { background: var(--card); border-color: var(--card-line); }
+.bcard.slim .face { display: flex; align-items: center; gap: 8px; padding: 5px 8px; }
+.bcard.slim .t { flex: 1; min-width: 0; font-weight: 400; color: var(--muted); text-decoration: line-through; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.bcard.slim .m { color: var(--muted); font-size: var(--t-meta); }
+.bcard.done .face .t { color: var(--muted); text-decoration: line-through; }
 
 /* Status icons: shape and color. Only "in progress" moves, slowly. */
 .status { width: 14px; height: 14px; margin-top: 3px; border-radius: 50%; display: grid; place-items: center; }

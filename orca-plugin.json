@@ -26,15 +26,6 @@
         "entry": "orca/panel/index.html"
       }
     ],
-    "customEditors": [
-      {
-        "id": "board",
-        "title": "Board",
-        "filenames": ["requests.json"],
-        "entry": "orca/board/index.html",
-        "priority": "option"
-      }
-    ],
     "statusBarItems": [
       {
         "id": "counter",

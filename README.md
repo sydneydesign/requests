@@ -53,12 +53,11 @@ Everything stays on your computer. There are no dependencies to install.
 
 ### Board
 
-Press **Board** at the top of the panel to open the requests in a full-width tab, with a **Board** view (one column per status) and a **List** view (the panel at full width).
+Press **Board** at the top of the panel to see the requests as columns, one per status: Needs you, In progress, Queued and Done. **List** switches back. The panel remembers the last view.
 
-- Orca opens the board on `~/.requests/requests.json`. The first time, Orca adds `~/.requests` as a folder workspace in the left sidebar. The board never edits the file directly.
-- Click a card to see what you said and Claude's last answer, with **Go to chat** and **Mark done**.
-- A done request stays on the board while the chat it came from is open in Orca. **Clear** hides every done request on the board. The panel keeps them all: set Done to All in its display menu.
-- Close the right sidebar to give the board the full width. In a narrow tab, the columns snap and "Needs you" stays pinned on the left.
+- Each card shows the request's ID, how long ago it changed, its title, and Claude's question or the thread. Press **Reply** on a card that needs you.
+- Click a card to see what you said and Claude's answer, with **Go to chat** and **Mark done**.
+- Widen the right sidebar to fit more columns. When it is narrow, the columns scroll sideways.
 
 | Status | Meaning |
 | --- | --- |
@@ -101,7 +100,7 @@ Load this folder in both apps:
 
 Orca reloads the plugin when its files change. `node claude/bin/requests.mjs help` lists the commands Claude uses.
 
-`dev/board-harness.html` renders the board and panel against test data in any browser, without Orca. Use `?data=demo|worst|empty|one|huge`, `&theme=light|dark` and `&view=board|list`. It is not part of the plugin.
+`dev/panel-harness.html` renders the panel against test data in any browser, without Orca. Use `?data=demo|worst|empty|one|huge`, `&view=board|list`, `&group=project|status` and `&theme=light|dark`. It is not part of the plugin.
 
 ## License
 
