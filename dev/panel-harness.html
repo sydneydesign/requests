@@ -24,12 +24,17 @@
     }
     .harness-toggle a { padding: 6px 10px; border-radius: 6px; color: #333; text-decoration: none; }
     .harness-toggle a.on { background: #fff; color: #000; }
+    .clean .harness-toggle { display: none; }
   </style>
   <script>
     const params = new URLSearchParams(location.search)
     const DATA = params.get('data') || 'worst'
     const THEME = params.get('theme') || 'dark'
     document.documentElement.classList.add(THEME)
+    // clean=1 hides the fixture switcher; w=<px> sets the panel width (headless browsers keep a
+    // wider minimum window), for screenshots.
+    if (params.get('clean')) document.documentElement.classList.add('clean')
+    if (params.get('w')) document.documentElement.style.cssText += `width:${params.get('w')}px;overflow:hidden;`
         try { localStorage.setItem('requests.view', JSON.stringify({ mode: params.get('view') || 'board', group: params.get('group') || 'project' })) } catch {}
 
     const now = Date.now()
@@ -77,6 +82,20 @@
         I('d3d3', 't4', 'done', path, { answer: 'Hecho.' })
       ]
     }
+    // Neutral sample used for the README screenshots.
+    const readme = {
+      threads: [T('t1', 'Pricing page', 'Website'), T('t2', 'Quarterly report', 'Operations'), T('t3', 'Login bug', 'Mobile app'), T('t4', 'Onboarding emails', 'Website')],
+      items: [
+        I('k3fp', 't1', 'need', 'Choose the plan names', { question: 'Starter, Team and Business, or Solo, Studio and Agency?', changed: ago(3), updated: ago(3) }),
+        I('w8rt', 't2', 'need', 'Send the draft to finance', { question: 'Due Friday. Want me to prepare the email?', updated: ago(41) }),
+        I('m2qa', 't2', 'run', 'Draft the summary section', { updated: ago(12) }),
+        I('p4zx', 't3', 'run', 'Fix the session timeout on Android', { via: 'Subagent', changed: ago(9), updated: ago(9) }),
+        I('r7ty', 't4', 'run', 'Rewrite the welcome email', { updated: ago(22) }),
+        I('n5bv', 't3', 'queue', 'Write a regression test for login', { via: 'Waits for the fix', updated: ago(30) }),
+        I('d1aa', 't1', 'done', 'Compare competitor pricing', { updated: ago(70) }),
+        I('d2bb', 't3', 'done', 'Reproduce the login bug', { updated: ago(95) })
+      ]
+    }
     const empty = { threads: [], items: [] }
     const one = { threads: [T('t1', 'Login bug', 'App')], items: [I('k3fp', 't1', 'need', 'Pick the hero layout', { question: 'Option A or B?', changed: ago(1) })] }
     const huge = { threads: [], items: [] }
@@ -84,7 +103,7 @@
     const S = ['need', 'run', 'queue', 'done']
     for (let n = 0; n < 1000; n++) huge.items.push(I('h' + n.toString(36).padStart(3, '0'), 't' + (n % 40), S[n % 4], 'Request ' + n + ' with a normal-length title', { updated: ago(n) }))
 
-    const fixtures = { demo, worst, empty, one, huge }
+    const fixtures = { demo, worst, empty, one, huge, readme }
     const data = { version: 2, ...fixtures[DATA] }
     const snapshot = () => ({ data, error: null, file: 'fixture' })
     const handlers = {

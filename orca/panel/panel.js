@@ -105,9 +105,11 @@
     return ['need', 'run', 'queue'].filter((s) => n[s]).map((s) => `<span title="${NAME[s]}">${icon(s, true)}${n[s]}</span>`).join('')
   }
 
-  // Takes you to the request's chat when it knows which one; otherwise copies the reference.
+  // Takes you to the request's chat when it knows which one, and copies the reference either way.
+  // A request that asks you something says Reply everywhere (row, card and detail); the others
+  // say Go to chat, or Copy reference when the chat is unknown.
   function replyButton(i, primary) {
-    const label = i.origin ? 'Go to chat' : 'Copy reference'
+    const label = i.status === 'need' ? 'Reply' : i.origin ? 'Go to chat' : 'Copy reference'
     return `<button class="${primary ? 'primary' : ''}" data-action="goto">${label}</button>`
   }
 

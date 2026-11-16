@@ -21,6 +21,8 @@
   /* Selected segment: white on grey in light mode, one step lighter than the track in dark. */
   --pill: var(--bg);
   --pill-line: var(--line);
+  /* An opened request: one block from its title to its buttons. */
+  --open: var(--hover);
 
   /* Board: cards on a grey column in light mode; in dark, the column stays near the background
      and cards are lifted one step, so they read as raised instead of as holes. */
@@ -32,9 +34,9 @@
   /* Motion: one strong ease-out for UI feedback (Emil Kowalski's curve). */
   --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
 }
-:root.dark { --need: #f0a43a; --run: #7aa7ff; --queue: #8f8f88; --done: #5fcf8a; --pill: color-mix(in srgb, var(--text) 16%, var(--bg)); --pill-line: color-mix(in srgb, var(--text) 22%, var(--bg)); --col: color-mix(in srgb, var(--text) 4%, var(--bg)); --card: color-mix(in srgb, var(--text) 9%, var(--bg)); --card-line: color-mix(in srgb, var(--text) 13%, var(--bg)); --card-hover: color-mix(in srgb, var(--text) 28%, var(--bg)); }
+:root.dark { --need: #f0a43a; --run: #7aa7ff; --queue: #8f8f88; --done: #5fcf8a; --pill: color-mix(in srgb, var(--text) 16%, var(--bg)); --pill-line: color-mix(in srgb, var(--text) 22%, var(--bg)); --col: color-mix(in srgb, var(--text) 4%, var(--bg)); --card: color-mix(in srgb, var(--text) 9%, var(--bg)); --card-line: color-mix(in srgb, var(--text) 13%, var(--bg)); --card-hover: color-mix(in srgb, var(--text) 28%, var(--bg)); --hover: color-mix(in srgb, var(--text) 7%, var(--bg)); --open: color-mix(in srgb, var(--text) 4.5%, var(--bg)); }
 @media (prefers-color-scheme: dark) {
-  :root:not(.light) { --need: #f0a43a; --run: #7aa7ff; --queue: #8f8f88; --done: #5fcf8a; --pill: color-mix(in srgb, var(--text) 16%, var(--bg)); --pill-line: color-mix(in srgb, var(--text) 22%, var(--bg)); --col: color-mix(in srgb, var(--text) 4%, var(--bg)); --card: color-mix(in srgb, var(--text) 9%, var(--bg)); --card-line: color-mix(in srgb, var(--text) 13%, var(--bg)); --card-hover: color-mix(in srgb, var(--text) 28%, var(--bg)); }
+  :root:not(.light) { --need: #f0a43a; --run: #7aa7ff; --queue: #8f8f88; --done: #5fcf8a; --pill: color-mix(in srgb, var(--text) 16%, var(--bg)); --pill-line: color-mix(in srgb, var(--text) 22%, var(--bg)); --col: color-mix(in srgb, var(--text) 4%, var(--bg)); --card: color-mix(in srgb, var(--text) 9%, var(--bg)); --card-line: color-mix(in srgb, var(--text) 13%, var(--bg)); --card-hover: color-mix(in srgb, var(--text) 28%, var(--bg)); --hover: color-mix(in srgb, var(--text) 7%, var(--bg)); --open: color-mix(in srgb, var(--text) 4.5%, var(--bg)); }
 }
 
 * { box-sizing: border-box; }
@@ -67,12 +69,13 @@ button { background: none; border: 0; cursor: pointer; padding: 0; text-align: l
 .summary .calm { color: var(--muted); font-weight: 500; }
 /* Header row, after Cursor and Linear: "Requests" and the counts by status on the left; search,
    display options and the List | Board switch on the right. */
-.top { display: flex; align-items: center; gap: 8px; }
+/* When the sidebar is too narrow for both, the tools wrap under the title, aligned right. */
+.top { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; }
 .top .summary { flex: 1 1 auto; min-width: 0; margin: 0; display: flex; align-items: center; gap: 10px; }
 .summary .ttl { font-weight: 600; }
 .counts { display: inline-flex; gap: 8px; font-size: var(--t-meta); font-weight: 500; color: var(--muted); font-variant-numeric: tabular-nums; }
 .counts > span { display: inline-flex; align-items: center; gap: 4px; }
-.ptools { display: flex; align-items: center; gap: 4px; flex: none; }
+.ptools { display: flex; align-items: center; gap: 4px; flex: none; margin-left: auto; }
 .iconbtn {
   position: relative; display: grid; place-items: center; width: 28px; height: 28px; border-radius: 6px; color: var(--muted);
   transition: transform 160ms var(--ease-out);
@@ -159,7 +162,11 @@ main { padding: 4px 4px 72px; }
   display: grid; grid-template-columns: 14px minmax(0, 1fr) auto; align-items: start; gap: 10px;
   width: 100%; padding: 6px 8px; border-radius: 6px; cursor: pointer;
 }
-.item > .row:hover, .item.open > .row { background: var(--hover); }
+.item:not(.open) > .row:hover { background: var(--hover); }
+/* The opened request is one block: the row and its detail share a background. */
+.item.open { background: var(--open); }
+.item.open > .row { border-radius: 6px 6px 0 0; }
+.item.open > .row:hover { background: var(--hover); }
 .row .body { min-width: 0; }
 .title { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .open .title { white-space: normal; overflow-wrap: anywhere; }
@@ -221,6 +228,7 @@ main.is-board { padding: 8px 0 72px; }
 .bcard .ctx { display: block; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .bcard .cardfoot { padding: 0 10px 10px; }
 .bcard .detail { margin: 0; padding: 8px 10px 10px; border-top: 1px solid var(--card-line); }
+.bcard.item.open { background: var(--card); }
 /* Done: one grey line each. */
 .bcard.slim { background: transparent; border-color: transparent; }
 .bcard.slim:hover { background: var(--card); border-color: var(--card-line); }
@@ -244,7 +252,7 @@ main.is-board { padding: 8px 0 72px; }
 }
 
 /* Detail */
-.detail { display: none; margin: 4px 0 8px 26px; padding: 8px 0 0; }
+.detail { display: none; margin: 0; padding: 6px 8px 10px 32px; }
 .open > .detail { display: block; }
 .detail h4 {
   margin: 0 0 2px;
@@ -264,6 +272,9 @@ main.is-board { padding: 8px 0 72px; }
   font-size: var(--t-meta); background: var(--bg);
 }
 .actions button:hover { background: var(--hover); }
+/* Inside an opened request the secondary buttons sit on its background, not on the page's. */
+.item.open .actions button:not(.primary):not(.confirm) { background: transparent; }
+.item.open .actions button:not(.primary):hover { background: var(--hover); }
 /* Press feedback: the button gives under the pointer. */
 .actions button { transition: transform 160ms var(--ease-out); }
 .actions button:active { transform: scale(0.97); }

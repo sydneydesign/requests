@@ -4,7 +4,7 @@ Follow what you ask Claude for, one thread at a time.
 
 When you send Claude Code several things in one message, Requests splits them into separate requests, groups them by project and topic, and tracks each one's status. [Orca](https://github.com/stablyai/orca) shows them in a sidebar panel, with a status bar counter for anything that needs your input.
 
-![The Requests panel in light and dark themes](docs/panel.png)
+![The Requests panel, grouped by project, in light and dark themes](docs/panel.png)
 
 ## How it works
 
@@ -49,14 +49,16 @@ Everything stays on your computer. There are no dependencies to install.
 - Open the flag icon in Orca's right sidebar. Requests are grouped by project. Inside each project, what needs you comes first, then what is in progress, then what is queued. Done requests fold into one line per project.
 - Use the display button (the sliders icon) to group by status instead, pick one project, or show all done requests instead of today's.
 - New updates from Claude show in bold with a dot. They count as read once you open them in the panel or write in the chat they came from.
-- To answer one, press **Go to chat**. Orca switches to the chat the request came from and copies its reference, so you can paste it and write after it: `[k3fp] the second option`. When you answer, Claude moves the request on.
+- To answer one, press **Reply**. Orca switches to the chat the request came from and copies its reference, so you can paste it and write after it: `[k3fp] the second option`. When you answer, Claude moves the request on.
 
 ### Board
 
 Press **Board** at the top of the panel to see the requests as columns, one per status: Needs you, In progress, Queued and Done. **List** switches back. The panel remembers the last view.
 
+![The Requests board in light and dark themes](docs/board.png)
+
 - Each card shows the request's ID, how long ago it changed, its title, and Claude's question or the thread. Press **Reply** on a card that needs you.
-- Click a card to see what you said and Claude's answer, with **Go to chat** and **Mark done**.
+- Click a card to see what you said and Claude's answer, with **Reply** (or **Go to chat** when there is no question) and **Mark done**.
 - Widen the right sidebar to fit more columns. When it is narrow, the columns scroll sideways.
 
 | Status | Meaning |
@@ -88,7 +90,7 @@ In Claude Code: `/plugin marketplace update requests`, then start a new session.
 
 - If Claude Code asks for permission every time it logs a request, allow `node …/requests.mjs` in `/permissions`.
 - The list is per computer. It doesn't sync between machines.
-- **Go to chat** opens the chat's tab, not a specific message in it. Requests logged before version 0.4.0 don't know their chat, so they offer **Copy reference** instead.
+- **Reply** and **Go to chat** open the chat's tab, not a specific message in it. Requests logged before version 0.4.0 don't know their chat, so they offer **Copy reference** instead.
 - Clicking the counter doesn't open the panel, because Orca doesn't let plugins open their own panel.
 
 ## Development
